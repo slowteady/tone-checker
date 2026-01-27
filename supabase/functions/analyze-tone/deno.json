@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "zod": "https://esm.sh/zod@3.23.8",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.4"
+  }
+}

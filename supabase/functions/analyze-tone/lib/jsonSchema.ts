@@ -1,0 +1,184 @@
+export const TONE_CHECKER_V2_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["overall_score", "summary", "category_scores", "signals", "suggestions", "warnings"],
+  properties: {
+    overall_score: { type: "integer", minimum: 0, maximum: 100 },
+    summary: { type: "string", minLength: 1, maxLength: 50 },
+    category_scores: {
+      type: "object",
+      additionalProperties: false,
+      required: ["emotion_attitude", "politeness_respect", "aggression_conflict", "clarity_delivery", "context_fit"],
+      properties: {
+        emotion_attitude: { $ref: "#/$defs/category_emotion_attitude" },
+        politeness_respect: { $ref: "#/$defs/category_politeness_respect" },
+        aggression_conflict: { $ref: "#/$defs/category_aggression_conflict" },
+        clarity_delivery: { $ref: "#/$defs/category_clarity_delivery" },
+        context_fit: { $ref: "#/$defs/category_context_fit" },
+      },
+    },
+    signals: { type: "array", minItems: 0, maxItems: 3, items: { $ref: "#/$defs/signal" } },
+    suggestions: { type: "array", minItems: 3, maxItems: 3, items: { $ref: "#/$defs/suggestion" } },
+    warnings: {
+      type: "array",
+      minItems: 0,
+      maxItems: 3,
+      items: { type: "string", minLength: 1, maxLength: 50 },
+    },
+  },
+  $defs: {
+    score_0_100: { type: "integer", minimum: 0, maximum: 100 },
+    short_comment_50: { type: "string", minLength: 1, maxLength: 50 },
+    category_base: {
+      type: "object",
+      additionalProperties: false,
+      required: ["score", "comment", "details"],
+      properties: {
+        score: { $ref: "#/$defs/score_0_100" },
+        comment: { $ref: "#/$defs/short_comment_50" },
+        details: { type: "object" },
+      },
+    },
+    detail_item: {
+      type: "object",
+      additionalProperties: false,
+      required: ["score", "comment"],
+      properties: {
+        score: { $ref: "#/$defs/score_0_100" },
+        comment: { $ref: "#/$defs/short_comment_50" },
+      },
+    },
+
+    category_emotion_attitude: {
+      allOf: [
+        { $ref: "#/$defs/category_base" },
+        {
+          properties: {
+            details: {
+              type: "object",
+              additionalProperties: false,
+              required: ["warmth_empathy", "emotional_stability"],
+              properties: {
+                warmth_empathy: { $ref: "#/$defs/detail_item" },
+                emotional_stability: { $ref: "#/$defs/detail_item" },
+              },
+            },
+          },
+        },
+      ],
+    },
+    category_politeness_respect: {
+      allOf: [
+        { $ref: "#/$defs/category_base" },
+        {
+          properties: {
+            details: {
+              type: "object",
+              additionalProperties: false,
+              required: ["politeness", "softness"],
+              properties: {
+                politeness: { $ref: "#/$defs/detail_item" },
+                softness: { $ref: "#/$defs/detail_item" },
+              },
+            },
+          },
+        },
+      ],
+    },
+    category_aggression_conflict: {
+      allOf: [
+        { $ref: "#/$defs/category_base" },
+        {
+          properties: {
+            details: {
+              type: "object",
+              additionalProperties: false,
+              required: ["non_aggressive", "conflict_mitigation"],
+              properties: {
+                non_aggressive: { $ref: "#/$defs/detail_item" },
+                conflict_mitigation: { $ref: "#/$defs/detail_item" },
+              },
+            },
+          },
+        },
+      ],
+    },
+    category_clarity_delivery: {
+      allOf: [
+        { $ref: "#/$defs/category_base" },
+        {
+          properties: {
+            details: {
+              type: "object",
+              additionalProperties: false,
+              required: ["clarity", "actionability"],
+              properties: {
+                clarity: { $ref: "#/$defs/detail_item" },
+                actionability: { $ref: "#/$defs/detail_item" },
+              },
+            },
+          },
+        },
+      ],
+    },
+    category_context_fit: {
+      allOf: [
+        { $ref: "#/$defs/category_base" },
+        {
+          properties: {
+            details: {
+              type: "object",
+              additionalProperties: false,
+              required: ["formality_fit", "low_misinterpretation_risk"],
+              properties: {
+                formality_fit: { $ref: "#/$defs/detail_item" },
+                low_misinterpretation_risk: { $ref: "#/$defs/detail_item" },
+              },
+            },
+          },
+        },
+      ],
+    },
+
+    signal: {
+      type: "object",
+      additionalProperties: false,
+      required: ["category", "sub_category", "level", "reason", "evidence"],
+      properties: {
+        category: {
+          type: "string",
+          enum: ["emotion_attitude", "politeness_respect", "aggression_conflict", "clarity_delivery", "context_fit"],
+        },
+        sub_category: {
+          type: "string",
+          enum: [
+            "warmth_empathy",
+            "emotional_stability",
+            "politeness",
+            "softness",
+            "non_aggressive",
+            "conflict_mitigation",
+            "clarity",
+            "actionability",
+            "formality_fit",
+            "low_misinterpretation_risk",
+          ],
+        },
+        level: { type: "string", enum: ["low", "medium", "high"] },
+        reason: { type: "string", minLength: 1, maxLength: 30 },
+        evidence: { type: "string", minLength: 1, maxLength: 30 },
+      },
+    },
+
+    suggestion: {
+      type: "object",
+      additionalProperties: false,
+      required: ["label", "description", "example"],
+      properties: {
+        label: { type: "string", minLength: 1, maxLength: 20 },
+        description: { type: "string", minLength: 1, maxLength: 50 },
+        example: { type: "string", minLength: 1, maxLength: 120 },
+      },
+    },
+  },
+} as const;
