@@ -7,9 +7,21 @@ if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
 
 const client = new OpenAI({ apiKey });
 
-export async function analyzeWithOpenAI(text: string): Promise<unknown> {
+type Context = {
+  relationship: "business" | "personal";
+  relationshipLabel: string;
+  situation: "neutral" | "sensitive" | "casual";
+  situationLabel: string;
+};
+
+export async function analyzeWithOpenAI(text: string, ctx: Context): Promise<unknown> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
+
+  const userContent =
+  `관계: ${ctx.relationshipLabel} (${ctx.relationship})\n` +
+  `상황: ${ctx.situationLabel} (${ctx.situation})\n` +
+  `문장: ${text}`;
 
   try {
     const res = await client.responses.create(
@@ -18,7 +30,7 @@ export async function analyzeWithOpenAI(text: string): Promise<unknown> {
         max_output_tokens: 700,
         input: [
           { role: "system", content: SYSTEM_MESSAGE },
-          { role: "user", content: text },
+          { role: "user", content: userContent },
         ],
         text: {
           format: {

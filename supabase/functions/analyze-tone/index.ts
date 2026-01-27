@@ -37,6 +37,27 @@ import { analyzeWithOpenAI } from "./lib/openai";
 import { ToneCheckerV2Zod } from "./lib/zod.ts";
 import { createClient } from "@supabase/supabase-js";
 
+type Relationship = "business" | "personal";
+type Situation = "neutral" | "sensitive" | "casual";
+
+type ReqBody = {
+  text?: string;
+  device_id?: string;
+  relationship?: Relationship;
+  situation?: Situation;
+};
+
+const RELATIONSHIP_LABEL: Record<Relationship, string> = {
+  business: "업무/비즈니스",
+  personal: "개인/사적 관계",
+};
+
+const SITUATION_LABEL: Record<Situation, string> = {
+  neutral: "일반/중립(안내·요청)",
+  sensitive: "조심/민감(불만·거절·문제)",
+  casual: "가벼움/캐주얼(편한 대화)",
+};
+
 // Supabase admin client (service role)
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -58,13 +79,23 @@ function json(status: number, body: unknown) {
   });
 }
 
+
+function isRelationship(x: unknown): x is Relationship {
+  return x === "business" || x === "personal";
+}
+
+function isSituation(x: unknown): x is Situation {
+  return x === "neutral" || x === "sensitive" || x === "casual";
+}
+
+
 Deno.serve(async (req) => {
   // 1. 입력 파싱
   if (req.method !== "POST") {
     return json(405, { error: "METHOD_NOT_ALLOWED" });
   }
 
-  let body: { text?: string; device_id?: string };
+  let body: ReqBody;
   try {
     body = await req.json();
   } catch {
@@ -77,17 +108,15 @@ Deno.serve(async (req) => {
     return json(400, { error: "INVALID_INPUT" });
   }
 
+   // relationship/situation: 없으면 기본값
+   const relationship: Relationship = isRelationship(body.relationship) ? body.relationship : "business";
+   const situation: Situation = isSituation(body.situation) ? body.situation : "neutral";
+
   // 2. 길이 검증 (20~800)
   const trimmed = text.trim();
   const length = trimmed.length;
-
-  if (length < 20) {
-    return json(400, { error: "TEXT_TOO_SHORT", min: 20 });
-  }
-
-  if (length > 800) {
-    return json(400, { error: "TEXT_TOO_LONG", max: 800 });
-  }
+  if (length < 20) return json(400, { error: "TEXT_TOO_SHORT", min: 20 });
+  if (length > 800) return json(400, { error: "TEXT_TOO_LONG", max: 800 });
 
   const accuracy_warning = length <= 50;
 
@@ -97,10 +126,15 @@ Deno.serve(async (req) => {
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const raw = await analyzeWithOpenAI(trimmed);
-      const parsed = ToneCheckerV2Zod.safeParse(raw);
+      const raw = await analyzeWithOpenAI(trimmed, {
+        relationship,
+        relationshipLabel: RELATIONSHIP_LABEL[relationship],
+        situation,
+        situationLabel: SITUATION_LABEL[situation],
+      });
 
       // 4. zod 검증
+      const parsed = ToneCheckerV2Zod.safeParse(raw);
       if (!parsed.success) {
         lastError = parsed.error;
         continue;

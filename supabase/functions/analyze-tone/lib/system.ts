@@ -44,6 +44,10 @@ JSON 이외의 텍스트는 절대 출력하지 마라.
 - formality_fit: 상황과 관계에 맞는 격식 수준
 - low_misinterpretation_risk: 오해 소지가 낮은 표현 정도
 
+[관계/상황 반영 규칙]
+- 입력에 관계(relationship)와 상황(situation)이 주어지면, context_fit/softness/갈등완충 관련 판단을 그 맥락에 맞춰 조정하라.
+- 예: business+sensitive는 완곡함/오해방지 비중을 높이고, personal+casual은 과도한 격식 감점을 완화하라.
+
 [comment 작성 규칙]
 - comment는 점수에 대한 간단한 이유 설명이다.
 - 평가적이되 공격적이거나 단정적인 표현은 사용하지 마라.
