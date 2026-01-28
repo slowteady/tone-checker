@@ -16,14 +16,14 @@ type ReqBody = {
 };
 
 const RELATIONSHIP_LABEL: Record<Relationship, string> = {
-  business: '업무/비즈니스',
-  personal: '개인/사적 관계',
+  business: '비즈니스',
+  personal: '개인',
 };
 
 const SITUATION_LABEL: Record<Situation, string> = {
-  neutral: '일반/중립(안내·요청)',
-  sensitive: '조심/민감(불만·거절·문제)',
-  casual: '가벼움/캐주얼(편한 대화)',
+  neutral: '일반',
+  sensitive: '조심',
+  casual: '편안',
 };
 
 type ApiErrorCode =
