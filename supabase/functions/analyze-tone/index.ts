@@ -1,44 +1,12 @@
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 
-// Setup type definitions for built-in Supabase Runtime APIs
-// import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { ToneCheckerV2Zod } from './lib/zod.ts';
+import { createClient } from '@supabase/supabase-js';
+import { reportError } from './lib/reportError.ts';
+import { isOpenAIRefusal } from './lib/openai.ts';
 
-// console.log("Hello from Functions!")
-
-// Deno.serve(async (req) => {
-//   const { name } = await req.json()
-//   const data = {
-//     message: `Hello ${name}!`,
-//   }
-
-//   return new Response(
-//     JSON.stringify(data),
-//     { headers: { "Content-Type": "application/json" } },
-//   )
-// })
-
-/* To invoke locally:
-
-  1. Run `supabase start` (see: https://supabase.com/docs/reference/cli/supabase-start)
-  2. Make an HTTP request:
-
-  curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/analyze-tone' \
-    --header 'Authorization: Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6ImI4MTI2OWYxLTIxZDgtNGYyZS1iNzE5LWMyMjQwYTg0MGQ5MCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjIwODQ4NjA0MDV9.CzYNXIirD-k-d9LfnqKJ5KDHeobnA8-M4aY9fNoYX8itUN46FH8-1FIIiv2pjdVHXLHplCWue7B8Wq3WhwGwbQ' \
-    --header 'Content-Type: application/json' \
-    --data '{"name":"Functions"}'
-
-*/
-
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
-import { analyzeWithOpenAI } from "./lib/openai";
-import { ToneCheckerV2Zod } from "./lib/zod.ts";
-import { createClient } from "@supabase/supabase-js";
-
-type Relationship = "business" | "personal";
-type Situation = "neutral" | "sensitive" | "casual";
+type Relationship = 'business' | 'personal';
+type Situation = 'neutral' | 'sensitive' | 'casual';
 
 type ReqBody = {
   text?: string;
@@ -48,77 +16,113 @@ type ReqBody = {
 };
 
 const RELATIONSHIP_LABEL: Record<Relationship, string> = {
-  business: "업무/비즈니스",
-  personal: "개인/사적 관계",
+  business: '업무/비즈니스',
+  personal: '개인/사적 관계',
 };
 
 const SITUATION_LABEL: Record<Situation, string> = {
-  neutral: "일반/중립(안내·요청)",
-  sensitive: "조심/민감(불만·거절·문제)",
-  casual: "가벼움/캐주얼(편한 대화)",
+  neutral: '일반/중립(안내·요청)',
+  sensitive: '조심/민감(불만·거절·문제)',
+  casual: '가벼움/캐주얼(편한 대화)',
 };
 
-// Supabase admin client (service role)
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+type ApiErrorCode =
+  | 'METHOD_NOT_ALLOWED'
+  | 'INVALID_JSON'
+  | 'INVALID_INPUT'
+  | 'TEXT_TOO_SHORT'
+  | 'TEXT_TOO_LONG'
+  | 'CONFIG_MISSING'
+  | 'OPENAI_IMPORT_FAILED'
+  | 'ANALYSIS_REFUSED'
+  | 'ANALYSIS_FAILED'
+  | 'USAGE_LIMIT_EXCEEDED';
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error("Missing Supabase environment variables");
-}
+type ApiResponse<T> = { ok: true; data: T } | { ok: false; error: { code: ApiErrorCode; message: string } };
 
-const supabaseAdmin = createClient(
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY,
-);
-
-// 공통 JSON 응답 헬퍼
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json; charset=utf-8" },
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
   });
 }
 
+function ok<T>(data: T, status = 200) {
+  const body: ApiResponse<T> = { ok: true, data };
+  return json(status, body);
+}
+
+function fail(status: number, code: ApiErrorCode, message: string) {
+  const body: ApiResponse<never> = { ok: false, error: { code, message } };
+  return json(status, body);
+}
 
 function isRelationship(x: unknown): x is Relationship {
-  return x === "business" || x === "personal";
+  return x === 'business' || x === 'personal';
 }
 
 function isSituation(x: unknown): x is Situation {
-  return x === "neutral" || x === "sensitive" || x === "casual";
+  return x === 'neutral' || x === 'sensitive' || x === 'casual';
 }
 
+// OpenAI는 필요할 때만 로드 (로컬 단계별 테스트/부팅 안정성 목적)
+type OpenAIContext = {
+  relationship: Relationship;
+  relationshipLabel: string;
+  situation: Situation;
+  situationLabel: string;
+};
 
 Deno.serve(async (req) => {
   // 1. 입력 파싱
-  if (req.method !== "POST") {
-    return json(405, { error: "METHOD_NOT_ALLOWED" });
+  if (req.method !== 'POST') {
+    return fail(405, 'METHOD_NOT_ALLOWED', '허용되지 않은 요청 방식이에요.');
   }
 
   let body: ReqBody;
   try {
     body = await req.json();
   } catch {
-    return json(400, { error: "INVALID_JSON" });
+    return fail(400, 'INVALID_JSON', '요청 형식이 올바르지 않아요. 다시 시도해 주세요.');
   }
 
   const { text, device_id } = body;
-
-  if (typeof text !== "string" || typeof device_id !== "string") {
-    return json(400, { error: "INVALID_INPUT" });
+  if (typeof text !== 'string' || typeof device_id !== 'string') {
+    return fail(400, 'INVALID_INPUT', '입력값이 올바르지 않아요. 다시 확인해 주세요.');
   }
 
-   // relationship/situation: 없으면 기본값
-   const relationship: Relationship = isRelationship(body.relationship) ? body.relationship : "business";
-   const situation: Situation = isSituation(body.situation) ? body.situation : "neutral";
+  // relationship/situation: 없으면 기본값
+  const relationship: Relationship = isRelationship(body.relationship) ? body.relationship : 'business';
+  const situation: Situation = isSituation(body.situation) ? body.situation : 'neutral';
 
   // 2. 길이 검증 (20~800)
   const trimmed = text.trim();
   const length = trimmed.length;
-  if (length < 20) return json(400, { error: "TEXT_TOO_SHORT", min: 20 });
-  if (length > 800) return json(400, { error: "TEXT_TOO_LONG", max: 800 });
+  if (length < 20) return fail(400, 'TEXT_TOO_SHORT', '문장을 20자 이상 입력해 주세요.');
+  if (length > 800) return fail(400, 'TEXT_TOO_LONG', '문장을 800자 이하로 줄여 주세요.');
 
   const accuracy_warning = length <= 50;
+
+  // Supabase admin client (service role)
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    reportError('CONFIG_MISSING', undefined, {
+      hasSupabaseUrl: !!SUPABASE_URL,
+      hasServiceRoleKey: !!SUPABASE_SERVICE_ROLE_KEY,
+    });
+    return fail(500, 'CONFIG_MISSING', '서버 설정 오류가 발생했어요. 잠시 후 다시 시도해 주세요.');
+  }
+
+  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  let analyzeWithOpenAI: ((text: string, ctx: OpenAIContext) => Promise<unknown>) | null = null;
+  try {
+    ({ analyzeWithOpenAI } = await import('./lib/openai.ts'));
+  } catch (err) {
+    reportError('OPENAI_IMPORT_FAILED', err);
+    return fail(500, 'OPENAI_IMPORT_FAILED', '분석 설정이 준비되지 않았어요. 잠시 후 다시 시도해 주세요.');
+  }
 
   // 3. OpenAI 호출 (최대 1회 재시도)
   let aiResult: unknown = null;
@@ -144,34 +148,37 @@ Deno.serve(async (req) => {
       break;
     } catch (err) {
       lastError = err;
+
+      // ✅ 거부(refusal)는 재시도해도 같은 결과일 가능성이 높아 즉시 종료
+      if (isOpenAIRefusal(err)) {
+        reportError('ANALYSIS_REFUSED', err, { device_id, relationship, situation });
+        return fail(400, 'ANALYSIS_REFUSED', '민감한 내용은 분석할 수 없어요. 문장을 바꿔서 다시 시도해 주세요.');
+      }
     }
   }
 
   if (!aiResult) {
     // ❗ 실패 시 usage 차감 없음
-    return json(502, {
-      error: "ANALYSIS_FAILED",
-      retry_attempted: true,
-      details: String((lastError as Error)?.message ?? lastError),
-    });
+    reportError('ANALYSIS_FAILED', lastError, { retry_attempted: true, device_id, relationship, situation });
+    return fail(502, 'ANALYSIS_FAILED', '분석에 실패했어요. 잠시 후 다시 시도해 주세요.');
   }
 
   // 5. 성공 시 usage 차감 (RPC)
-  const { error: rpcError } = await supabaseAdmin.rpc(
-    "use_analysis_once",
-    { p_device_id: device_id },
-  );
+  const { data, error } = await supabaseAdmin.rpc('use_analysis_once', { p_device_id: device_id });
+  const row = Array.isArray(data) ? data[0] : data;
 
-  if (rpcError) {
-    return json(500, {
-      error: "USAGE_DEDUCT_FAILED",
-      details: rpcError.message,
-    });
+  if (error || !row?.success) {
+    return fail(403, 'USAGE_LIMIT_EXCEEDED', '오늘 사용 가능 횟수를 모두 사용했어요.');
   }
 
   // 6. JSON 반환
-  return json(200, {
-    ...aiResult,
+  return ok({
+    ...(aiResult as Record<string, unknown>),
     accuracy_warning,
+    usage: {
+      remaining_free: row.remaining_free,
+      remaining_rewarded: row.remaining_rewarded,
+      used_type: row.used_type,
+    },
   });
 });
