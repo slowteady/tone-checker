@@ -57,10 +57,14 @@ function Home() {
       return;
     }
 
-    navigation.navigate('/result');
+    navigation.push('/loading', {
+      relationship,
+      situation,
+      text,
+    });
   }, [text, navigation]);
 
-  const hasLimit = true;
+  const hasLimit = false;
 
   return (
     <>
