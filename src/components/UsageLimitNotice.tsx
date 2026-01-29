@@ -9,6 +9,7 @@ export const UsageLimitNotice = ({ onWatchAd }: { onWatchAd: () => void }) => {
       <Txt
         typography="st11"
         color={colors.whiteOpacity800}
+        fontWeight="bold"
       >{`오늘 분석 횟수를 모두 사용했어요\n광고를 보고 1회 더 사용할 수 있어요`}</Txt>
 
       <Button display="block" size="tiny" onPress={onWatchAd}>
