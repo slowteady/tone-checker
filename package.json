@@ -6,7 +6,8 @@
     "build": "granite build",
     "test": "jest --passWithNoTests",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "clean": "rm -rf .granite node_modules"
   },
   "dependencies": {
     "@apps-in-toss/framework": "^1.8.0",
