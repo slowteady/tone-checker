@@ -1,0 +1,95 @@
+{
+  "overall_score": 50,
+  "summary": "약간의 부정적 요소가 느껴져요.",
+  "category_scores": {
+    "emotion_attitude": {
+      "score": 40,
+      "comment": "공감이나 친근함이 부족해요.",
+      "details": {
+        "warmth_empathy": {
+          "score": 30,
+          "comment": "친근함이 느껴지지 않아요."
+        },
+        "emotional_stability": {
+          "score": 50,
+          "comment": "감정은 비교적 안정적이에요."
+        }
+      }
+    },
+    "politeness_respect": {
+      "score": 45,
+      "comment": "예의가 떨어지는 표현이에요.",
+      "details": {
+        "politeness": {
+          "score": 40,
+          "comment": "존중하는 표현이 부족해요."
+        },
+        "softness": {
+          "score": 50,
+          "comment": "부드러움이 부족해요."
+        }
+      }
+    },
+    "aggression_conflict": {
+      "score": 60,
+      "comment": "약간의 공격성이 느껴져요.",
+      "details": {
+        "non_aggressive": {
+          "score": 50,
+          "comment": "공격적인 표현은 하진 않아요."
+        },
+        "conflict_mitigation": {
+          "score": 60,
+          "comment": "갈등을 완화하는 표현은 아니에요."
+        }
+      }
+    },
+    "clarity_delivery": {
+      "score": 70,
+      "comment": "명확성을 유지하고 있어요.",
+      "details": {
+        "clarity": {
+          "score": 70,
+          "comment": "메시지가 비교적 명확해요."
+        },
+        "actionability": {
+          "score": 70,
+          "comment": "행동이 명확하게 전달돼요."
+        }
+      }
+    },
+    "context_fit": {
+      "score": 55,
+      "comment": "상황에 적합하지 않을 수 있어요.",
+      "details": {
+        "formality_fit": {
+          "score": 50,
+          "comment": "격식이 부족해요."
+        },
+        "low_misinterpretation_risk": {
+          "score": 60,
+          "comment": "오해의 소지가 다소 있어요."
+        }
+      }
+    }
+  },
+  "signals": [],
+  "suggestions": [
+    {
+      "label": "부드러운 표현 사용",
+      "description": "더 부드러운 표현으로 바꿔보세요.",
+      "example": "그럼 제가 알아서 진행하겠습니다."
+    },
+    {
+      "label": "공감 표현 추가",
+      "description": "상대방에 대한 공감을 표현해보세요.",
+      "example": "그럼 제가 생각해보겠습니다."
+    },
+    {
+      "label": "긍정적 언어 사용",
+      "description": "긍정적인 언어로 바꿔보세요.",
+      "example": "상황을 잘 이해했으니, 제가 잘 처리할게요."
+    }
+  ],
+  "warnings": ["비즈니스 상황에서 예의에 주의해야 해요.", "상대의 감정을 고려하는 것이 중요해요."]
+}

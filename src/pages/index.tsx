@@ -1,4 +1,4 @@
-import { createRoute, Flex, Stack } from '@granite-js/react-native';
+import { createRoute, Flex, Stack, useNavigation } from '@granite-js/react-native';
 import {
   Asset,
   FixedBottomCTA,
@@ -8,7 +8,7 @@ import {
   Toast,
   Txt,
 } from '@toss/tds-react-native';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { colors } from '@toss/tds-colors';
 import { RELATIONSHIP_OPTIONS, SITUATION_OPTIONS, type Relationship, type Situation } from 'constants/params';
@@ -17,20 +17,29 @@ export const Route = createRoute('/', {
   component: Page,
 });
 
+// TODO
+// [ ] 남은 횟수 조회
+// [ ] 에러 처리
+// [ ] 광고 로드 처리
+
 function Page() {
   const [relationship, setRelationship] = useState<Relationship>('business');
   const [situation, setSituation] = useState<Situation>('neutral');
   const [text, setText] = useState<string>('');
   const [toastOpen, setToastOpen] = useState(false);
 
-  const goToAnalyze = () => {
+  const navigation = useNavigation();
+
+  const goToAnalyze = useCallback(() => {
+    const isTextTooShort = text.length < 20;
+
     if (isTextTooShort) {
       setToastOpen(true);
       return;
     }
-  };
 
-  const isTextTooShort = text.length < 20;
+    navigation.navigate('/result');
+  }, [text, navigation]);
 
   return (
     <FixedBottomCTAProvider
@@ -89,21 +98,16 @@ function Page() {
           </SegmentedControl.Root>
         </Flex>
 
-        <TextArea
-          placeholder={`상대에게 보내고 싶은 문장을 입력해 주세요.`}
-          value={text}
-          onChangeText={setText}
-          maxLength={800}
-          textAreaStyle={{ height: 200 }}
-          containerStyle={{ paddingVertical: 0, paddingHorizontal: 0, marginBottom: 24 }}
-          help={
-            <Stack
-              direction="horizontal"
-              align="center"
-              justify="space-between"
-              style={{ paddingVertical: 8, width: '100%' }}
-            >
-              <Flex direction="row" align="center">
+        <View style={{ position: 'relative' }}>
+          <TextArea
+            placeholder={`상대에게 보내고 싶은 문장을 입력해 주세요.`}
+            value={text}
+            onChangeText={setText}
+            maxLength={800}
+            textAreaStyle={{ height: 180, marginBottom: 20 }}
+            containerStyle={{ paddingVertical: 0, paddingHorizontal: 0, marginBottom: 24 }}
+            help={
+              <Stack direction="horizontal" align="center" style={{ paddingVertical: 8, width: '100%' }}>
                 <Asset.Icon
                   name="icon-info-circle-blue"
                   frameShape={{ width: 16, height: 16 }}
@@ -113,13 +117,16 @@ function Page() {
                 <Txt typography="st12" fontWeight="semiBold" color={colors.grey500}>
                   {`최소 20자 이상 입력해주세요.`}
                 </Txt>
-              </Flex>
-              <Txt typography="st12" fontWeight="bold" color={colors.grey500}>
-                {text.length} / 800
-              </Txt>
-            </Stack>
-          }
-        />
+              </Stack>
+            }
+          />
+
+          <View style={styles.indicator}>
+            <Txt typography="st12" fontWeight="bold" color={colors.grey500}>
+              {text.length} / 800
+            </Txt>
+          </View>
+        </View>
 
         <FixedBottomCTA onPress={goToAnalyze}>
           <Txt typography="t6" fontWeight="bold" color={colors.white}>
@@ -154,5 +161,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'baseline',
     borderRadius: 9999,
+  },
+  indicator: {
+    position: 'absolute',
+    bottom: 80,
+    right: 20,
+    backgroundColor: colors.background,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
 });
