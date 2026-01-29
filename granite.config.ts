@@ -16,6 +16,10 @@ export default defineConfig({
           name: 'clipboard',
           access: 'read',
         },
+        {
+          name: 'clipboard',
+          access: 'write',
+        },
       ],
     }),
   ],
