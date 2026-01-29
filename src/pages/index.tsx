@@ -1,4 +1,4 @@
-import { createRoute, Flex, Stack, useNavigation } from '@granite-js/react-native';
+import { createRoute, Flex, useNavigation } from '@granite-js/react-native';
 import {
   Asset,
   FixedBottomCTA,
@@ -8,21 +8,22 @@ import {
   Toast,
   Txt,
 } from '@toss/tds-react-native';
-import React, { useCallback, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Keyboard, StyleSheet, View } from 'react-native';
 import { colors } from '@toss/tds-colors';
 import { RELATIONSHIP_OPTIONS, SITUATION_OPTIONS, type Relationship, type Situation } from 'constants/params';
 import { AdBottomSheet, UsageLimitNotice } from 'components';
 import { getDeviceId } from '@apps-in-toss/framework';
 import { ErrorResult } from 'components/ErrorResult';
+import { useFormStore } from 'stores/form';
 
 export const Route = createRoute('/', {
   component: Page,
 });
 
 // TODO
+// 1. 루트 페이지
 // [ ] 남은 횟수 조회
-// [ ] 에러 처리
 // [ ] 광고 로드 처리
 
 function Page() {
@@ -41,13 +42,19 @@ function Page() {
 }
 
 function Home() {
-  const [relationship, setRelationship] = useState<Relationship>('business');
-  const [situation, setSituation] = useState<Situation>('neutral');
-  const [text, setText] = useState<string>('');
+  const relationship = useFormStore((s) => s.relationship);
+  const situation = useFormStore((s) => s.situation);
+  const text = useFormStore((s) => s.text);
+  const setRelationship = useFormStore((s) => s.setRelationship);
+  const setSituation = useFormStore((s) => s.setSituation);
+  const setText = useFormStore((s) => s.setText);
+  const resetForm = useFormStore((s) => s.reset);
+
   const [toastOpen, setToastOpen] = useState(false);
   const [adBottomSheetOpen, setAdBottomSheetOpen] = useState(false);
-
   const navigation = useNavigation();
+
+  const hasLimit = false;
 
   const goToAnalyze = useCallback(() => {
     const isTextTooShort = text.length < 20;
@@ -57,29 +64,32 @@ function Home() {
       return;
     }
 
-    navigation.push('/loading', {
-      relationship,
-      situation,
-      text,
-    });
+    navigation.push('/loading');
   }, [text, navigation]);
 
-  const hasLimit = false;
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      Keyboard.dismiss();
+    });
+
+    return unsubscribe;
+  }, [navigation, resetForm]);
 
   return (
     <>
       <FixedBottomCTAProvider wrapperProps={{ automaticallyAdjustKeyboardInsets: true }}>
         <View style={styles.contentContainer}>
-          <Txt
-            typography="t1"
-            fontWeight="bold"
-            style={{ marginBottom: 16 }}
-            onPress={() => setAdBottomSheetOpen(true)}
-          >
-            {`AI가 문장의 말투를 \n상황에 맞게 다듬어드려요`}
+          <Txt typography="t1" fontWeight="bold" style={{ marginBottom: 16 }}>
+            {`AI가 상황에 맞게\n말투를 다듬어드려요`}
           </Txt>
+
           <Flex direction="row" style={[styles.badge, { marginBottom: 24 }]}>
-            <Asset.Icon name="icon-lightning-blue" frameShape={{ width: 18, height: 18 }} style={{ marginRight: 6 }} />
+            <Asset.Icon
+              name="icon-lightning-blue"
+              frameShape={{ width: 18, height: 18 }}
+              style={{ marginRight: 6 }}
+              accessibilityLabel={'오늘 남은 횟수'}
+            />
             <Txt typography="t7" fontWeight="bold" color={colors.grey500} style={{ marginRight: 4 }}>
               오늘 남은 횟수
             </Txt>
@@ -139,17 +149,18 @@ function Home() {
               textAreaStyle={{ height: 180, marginBottom: 20 }}
               containerStyle={{ paddingVertical: 0, paddingHorizontal: 0, marginBottom: 24 }}
               help={
-                <Stack direction="horizontal" align="center" style={{ paddingVertical: 8, width: '100%' }}>
+                <Flex direction="row" align="center" style={{ paddingVertical: 8, width: '100%' }}>
                   <Asset.Icon
                     name="icon-info-circle-blue"
                     frameShape={{ width: 16, height: 16 }}
                     style={{ marginRight: 4 }}
                     color={colors.red500}
+                    accessibilityLabel={'안내 아이콘'}
                   />
                   <Txt typography="st12" fontWeight="semiBold" color={colors.grey500}>
                     {`최소 20자 이상 입력해주세요.`}
                   </Txt>
-                </Stack>
+                </Flex>
               }
             />
 
