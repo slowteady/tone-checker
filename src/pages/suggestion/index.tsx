@@ -1,13 +1,17 @@
-import { createRoute } from '@granite-js/react-native';
+import { createRoute, useNavigation } from '@granite-js/react-native';
 import { colors, FixedBottomCTA, FixedBottomCTAProvider, Txt } from '@toss/tds-react-native';
 import { CopyCard } from 'components';
 import { StyleSheet, View } from 'react-native';
+import mockData from 'mock/signals.json';
 
 export const Route = createRoute('/suggestion', {
   component: Page,
 });
 
 function Page() {
+  const navigation = useNavigation();
+  const suggestions = mockData.suggestions;
+
   return (
     <FixedBottomCTAProvider>
       <View style={styles.container}>
@@ -15,14 +19,14 @@ function Page() {
           이런 표현은 어떠세요?
         </Txt>
 
-        <CopyCard
-          label="긍정적 언어 사용"
-          description="더 온화한 표현이 필요해요."
-          example="안녕하세요. 지난번에도 같은 문제가 있었는데 이번에도 지연되고 있어서 아쉽습니다."
-        />
+        {suggestions.map((suggestion, index) => (
+          <View key={index} style={{ marginBottom: 16 }}>
+            <CopyCard label={suggestion.label} description={suggestion.description} example={suggestion.example} />
+          </View>
+        ))}
       </View>
 
-      <FixedBottomCTA>
+      <FixedBottomCTA onPress={() => navigation.popToTop()}>
         <Txt typography="t6" fontWeight="bold" color={colors.white}>
           홈으로 돌아가기
         </Txt>
