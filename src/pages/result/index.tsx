@@ -8,9 +8,6 @@ export const Route = createRoute('/result', {
   component: Page,
 });
 
-// TODO
-// [ ] 결과 데이터 조회
-
 function Page() {
   return (
     <FixedBottomCTAProvider>

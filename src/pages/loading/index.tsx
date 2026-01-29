@@ -14,10 +14,18 @@ function Page() {
   const relationship = useFormStore((s) => s.relationship);
   const situation = useFormStore((s) => s.situation);
   const text = useFormStore((s) => s.text);
+  const resetForm = useFormStore((s) => s.reset);
 
   const overlay = useOverlay();
   const backEvent = useBackEvent();
   const navigation = useNavigation();
+
+  useEffect(() => {
+    setTimeout(() => {
+      resetForm();
+      navigation.replace('/suggestion');
+    }, 1000);
+  }, []);
 
   const openConfirmDialog = useCallback(() => {
     return new Promise<boolean>((resolve) => {
