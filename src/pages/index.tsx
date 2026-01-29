@@ -24,7 +24,19 @@ export const Route = createRoute('/', {
 // TODO
 // 1. 루트 페이지
 // [ ] 남은 횟수 조회
-// [ ] 광고 로드 처리
+// [ ] 횟수 있을 때, 전면 광고 preload 처리
+// [ ] 횟수 없을 때, 보상형 광고 preload 처리
+// [ ] 분석하기 버튼 클릭하면 광고 꺼내고 /loading 페이지 이동
+// 2. loading 페이지
+// [ ] 전면 광고 출력
+// [ ] 데이터 패칭 후에 스토어에 담고 /result 페이지 이동
+// 3. result 페이지
+// [ ] 스토어에서 데이터 가져와서 뿌려주기
+// [ ] UI 구현
+// [ ] 개선된 문장 확인하기 버튼 클릭하면 /suggestion 페이지 이동
+// 4. suggestion 페이지
+// [ ] 스토어에서 데이터 가져와서 뿌려주기
+// [ ] 홈으로 돌아가기 버튼 클릭하면 루트 페이지 이동
 
 function Page() {
   const [hasError, setHasError] = useState(false);
