@@ -1,12 +1,30 @@
 import { createRoute } from '@granite-js/react-native';
 import { Loader, Result } from '@toss/tds-react-native';
+import { useEffect } from 'react';
 import { View } from 'react-native';
+import { useBackEvent } from '@granite-js/react-native';
 
 export const Route = createRoute('/loading', {
   component: Page,
 });
 
 function Page() {
+  const backEvent = useBackEvent();
+
+  useEffect(() => {
+    const callback = () => {};
+
+    if (callback != null) {
+      backEvent.addEventListener(callback);
+
+      return () => {
+        backEvent.removeEventListener(callback);
+      };
+    }
+
+    return;
+  }, [backEvent]);
+
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
       <Result
