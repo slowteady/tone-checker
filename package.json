@@ -16,11 +16,12 @@
     "@granite-js/react-native": "0.1.34",
     "@supabase/supabase-js": "^2.91.1",
     "@tanstack/react-query": "^5.90.20",
-    "@toss/tds-colors": "^0.1.0",
-    "@toss/tds-react-native": "^1.3.8",
+    "@toss/tds-colors": "0.1.0",
+    "@toss/tds-react-native": "1.3.8",
     "axios": "^1.13.4",
     "react": "18.2.0",
-    "react-native": "0.72.6"
+    "react-native": "0.72.6",
+    "zustand": "^5.0.10"
   },
   "devDependencies": {
     "@babel/core": "7.28.5",
