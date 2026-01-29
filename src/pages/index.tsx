@@ -13,6 +13,8 @@ import { StyleSheet, View } from 'react-native';
 import { colors } from '@toss/tds-colors';
 import { RELATIONSHIP_OPTIONS, SITUATION_OPTIONS, type Relationship, type Situation } from 'constants/params';
 import { AdBottomSheet, UsageLimitNotice } from 'components';
+import { getDeviceId } from '@apps-in-toss/framework';
+import { ErrorResult } from 'components/ErrorResult';
 
 export const Route = createRoute('/', {
   component: Page,
@@ -24,6 +26,21 @@ export const Route = createRoute('/', {
 // [ ] 광고 로드 처리
 
 function Page() {
+  const [hasError, setHasError] = useState(false);
+  const id = getDeviceId();
+
+  const handleRetry = () => {
+    setHasError(false);
+  };
+
+  if (!id || hasError) {
+    return <ErrorResult onRetry={handleRetry} />;
+  }
+
+  return <Home />;
+}
+
+function Home() {
   const [relationship, setRelationship] = useState<Relationship>('business');
   const [situation, setSituation] = useState<Situation>('neutral');
   const [text, setText] = useState<string>('');
