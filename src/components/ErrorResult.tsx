@@ -11,6 +11,8 @@ export const ErrorResult = ({ onRetry }: ErrorResultProps) => {
         <Asset.Image
           source={{ uri: 'https://static.toss.im/lotties/empty-2-spot-apng.png' }}
           frameShape={Asset.frameShape.CleanW80}
+          accessibilityLabel={'에러 결과 이미지'}
+          style={null}
         />
       }
       title="다시 시도해주세요"
