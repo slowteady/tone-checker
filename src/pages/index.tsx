@@ -3,19 +3,24 @@ import {
   Asset,
   FixedBottomCTA,
   FixedBottomCTAProvider,
+  Loader,
   SegmentedControl,
   TextArea,
   Toast,
   Txt,
 } from '@toss/tds-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { Keyboard, StyleSheet, View } from 'react-native';
 import { colors } from '@toss/tds-colors';
 import { RELATIONSHIP_OPTIONS, SITUATION_OPTIONS, type Relationship, type Situation } from 'constants/params';
-import { AdBottomSheet, UsageLimitNotice } from 'components';
 import { getDeviceId } from '@apps-in-toss/framework';
-import { ErrorResult } from 'components/ErrorResult';
 import { useFormStore } from 'stores/form';
+import { useSuspenseQuery } from '@tanstack/react-query';
+import { useRemainingUsage } from 'hooks/useRemainingUsage';
+import { AdBottomSheet } from 'components/AdBottomSheet';
+import { UsageLimitNotice } from 'components/UsageLimitNotice';
+import { useLoadAd } from 'hooks/useLoadAd';
+import { ErrorResult } from 'components/ErrorResult';
 
 export const Route = createRoute('/', {
   component: Page,
@@ -23,40 +28,55 @@ export const Route = createRoute('/', {
 
 // TODO
 // 1. 루트 페이지
-// [ ] 남은 횟수 조회
-// [ ] 횟수 있을 때, 전면 광고 preload 처리
-// [ ] 횟수 없을 때, 보상형 광고 preload 처리
+// [x] 남은 횟수 조회
+// [x] 횟수 있을 때, 전면 광고 preload 처리
+// [x] 횟수 없을 때, 보상형 광고 preload 처리
 // [ ] 분석하기 버튼 클릭하면 광고 꺼내고 /loading 페이지 이동
+
 // 2. loading 페이지
 // [ ] 전면 광고 출력
 // [ ] 데이터 패칭 후에 스토어에 담고 /result 페이지 이동
+
 // 3. result 페이지
 // [ ] 스토어에서 데이터 가져와서 뿌려주기
 // [ ] UI 구현
 // [ ] 개선된 문장 확인하기 버튼 클릭하면 /suggestion 페이지 이동
+
 // 4. suggestion 페이지
 // [ ] 스토어에서 데이터 가져와서 뿌려주기
 // [ ] 홈으로 돌아가기 버튼 클릭하면 루트 페이지 이동
 
 function Page() {
   const [hasError, setHasError] = useState(false);
-  const id = getDeviceId();
+  const deviceId = getDeviceId();
 
   const handleRetry = () => {
     setHasError(false);
   };
 
-  if (!id || hasError) {
+  if (!deviceId || hasError) {
     return <ErrorResult onRetry={handleRetry} />;
   }
 
-  return <Home />;
+  return (
+    <Suspense
+      fallback={
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Loader />
+        </View>
+      }
+    >
+      <Home deviceId={deviceId} />
+    </Suspense>
+  );
 }
 
-function Home() {
+function Home({ deviceId }: { deviceId: string }) {
   const relationship = useFormStore((s) => s.relationship);
   const situation = useFormStore((s) => s.situation);
   const text = useFormStore((s) => s.text);
+
+  const setDeviceId = useFormStore((s) => s.setDeviceId);
   const setRelationship = useFormStore((s) => s.setRelationship);
   const setSituation = useFormStore((s) => s.setSituation);
   const setText = useFormStore((s) => s.setText);
@@ -66,9 +86,14 @@ function Home() {
   const [adBottomSheetOpen, setAdBottomSheetOpen] = useState(false);
   const navigation = useNavigation();
 
-  const hasLimit = false;
+  const { data } = useSuspenseQuery({ ...useRemainingUsage(deviceId) });
 
-  const goToAnalyze = useCallback(() => {
+  const hasLimit = data.has_limit;
+  const remainingTotal = data.remaining_total;
+
+  useLoadAd(hasLimit ? import.meta.env.DISPLAY_AD_DEV_ID : import.meta.env.REWARD_AD_DEV_ID);
+
+  const executeAnalyze = useCallback(() => {
     const isTextTooShort = text.length < 20;
 
     if (isTextTooShort) {
@@ -80,12 +105,14 @@ function Home() {
   }, [text, navigation]);
 
   useEffect(() => {
+    setDeviceId(deviceId);
+
     const unsubscribe = navigation.addListener('blur', () => {
       Keyboard.dismiss();
     });
 
     return unsubscribe;
-  }, [navigation, resetForm]);
+  }, [navigation, resetForm, setDeviceId, deviceId]);
 
   return (
     <>
@@ -106,7 +133,7 @@ function Home() {
               오늘 남은 횟수
             </Txt>
             <Txt typography="t7" fontWeight="bold" color={colors.blue900}>
-              3
+              {remainingTotal}
             </Txt>
           </Flex>
 
@@ -183,7 +210,7 @@ function Home() {
             </View>
           </View>
 
-          <FixedBottomCTA onPress={goToAnalyze} disabled={hasLimit}>
+          <FixedBottomCTA onPress={executeAnalyze} disabled={hasLimit}>
             <Txt typography="t6" fontWeight="bold" color={colors.white}>
               분석하기
             </Txt>

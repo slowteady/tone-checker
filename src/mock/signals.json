@@ -30,7 +30,7 @@
         }
       }
     },
-    "aggression_conflict": {
+    "conflict_safety": {
       "score": 40,
       "comment": "갈등을 유발할 수 있는 표현이 있어요.",
       "details": {
@@ -82,7 +82,7 @@
       "evidence": "왜 이런 식으로 처리하시는지 이해가 어렵습니다."
     },
     {
-      "category": "aggression_conflict",
+      "category": "conflict_safety",
       "sub_category": "conflict_mitigation",
       "level": "high",
       "reason": "갈등을 야기할 수 있는 표현이 있어요.",

@@ -1,8 +1,8 @@
 import { createRoute, useNavigation } from '@granite-js/react-native';
 import { colors, FixedBottomCTA, FixedBottomCTAProvider, Txt } from '@toss/tds-react-native';
-import { CopyCard } from 'components';
 import { StyleSheet, View } from 'react-native';
 import mockData from 'mock/signals.json';
+import { CopyCard } from 'components/CopyCard';
 
 export const Route = createRoute('/suggestion', {
   component: Page,

@@ -28,7 +28,7 @@ export const ToneCheckerV2Zod = z.object({
       politeness: detailItem,
       softness: detailItem,
     }),
-    aggression_conflict: createCategory({
+    conflict_safety: createCategory({
       non_aggressive: detailItem,
       conflict_mitigation: detailItem,
     }),
@@ -47,7 +47,7 @@ export const ToneCheckerV2Zod = z.object({
         category: z.enum([
           'emotion_attitude',
           'politeness_respect',
-          'aggression_conflict',
+          'conflict_safety',
           'clarity_delivery',
           'context_fit',
         ]),

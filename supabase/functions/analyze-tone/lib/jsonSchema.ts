@@ -9,11 +9,11 @@ export const TONE_CHECKER_V2_SCHEMA = {
     category_scores: {
       type: 'object',
       additionalProperties: false,
-      required: ['emotion_attitude', 'politeness_respect', 'aggression_conflict', 'clarity_delivery', 'context_fit'],
+      required: ['emotion_attitude', 'politeness_respect', 'conflict_safety', 'clarity_delivery', 'context_fit'],
       properties: {
         emotion_attitude: { $ref: '#/$defs/category_emotion_attitude' },
         politeness_respect: { $ref: '#/$defs/category_politeness_respect' },
-        aggression_conflict: { $ref: '#/$defs/category_aggression_conflict' },
+        conflict_safety: { $ref: '#/$defs/category_conflict_safety' },
         clarity_delivery: { $ref: '#/$defs/category_clarity_delivery' },
         context_fit: { $ref: '#/$defs/category_context_fit' },
       },
@@ -87,7 +87,7 @@ export const TONE_CHECKER_V2_SCHEMA = {
       },
     },
 
-    category_aggression_conflict: {
+    category_conflict_safety: {
       type: 'object',
       additionalProperties: false,
       required: ['score', 'comment', 'details'],
@@ -151,7 +151,7 @@ export const TONE_CHECKER_V2_SCHEMA = {
       properties: {
         category: {
           type: 'string',
-          enum: ['emotion_attitude', 'politeness_respect', 'aggression_conflict', 'clarity_delivery', 'context_fit'],
+          enum: ['emotion_attitude', 'politeness_respect', 'conflict_safety', 'clarity_delivery', 'context_fit'],
         },
         sub_category: {
           type: 'string',

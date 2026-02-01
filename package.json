@@ -13,7 +13,9 @@
     "@apps-in-toss/framework": "^1.8.0",
     "@granite-js/native": "0.1.34",
     "@granite-js/plugin-env": "^0.1.34",
+    "@granite-js/plugin-sentry": "^0.1.34",
     "@granite-js/react-native": "0.1.34",
+    "@sentry/react-native": "^7.11.0",
     "@supabase/supabase-js": "^2.91.1",
     "@tanstack/react-query": "^5.90.20",
     "@toss/tds-colors": "0.1.0",
@@ -21,6 +23,7 @@
     "axios": "^1.13.4",
     "react": "18.2.0",
     "react-native": "0.72.6",
+    "zod": "^4.3.6",
     "zustand": "^5.0.10"
   },
   "devDependencies": {

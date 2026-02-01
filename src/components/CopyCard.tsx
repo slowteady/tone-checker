@@ -1,8 +1,8 @@
 import { colors } from '@toss/tds-colors';
 import { Asset, Button, Tooltip, Txt } from '@toss/tds-react-native';
-import { useClipboardCopy } from 'hooks';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useClipboardCopy } from 'hooks/useClipboardCopy';
 
 export interface CopyCardProps {
   label: string;

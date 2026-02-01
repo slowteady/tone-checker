@@ -13,6 +13,7 @@ type ReqBody = {
   device_id?: string;
   relationship?: Relationship;
   situation?: Situation;
+  platform?: string;
 };
 
 const RELATIONSHIP_LABEL: Record<Relationship, string> = {
@@ -73,6 +74,23 @@ type OpenAIContext = {
   situationLabel: string;
 };
 
+type UseOnceRow = {
+  allowed: boolean;
+  used_from: 'free_used' | 'rewarded_used' | 'limit_exceeded';
+  remaining_free: number;
+  remaining_rewarded: number;
+  remaining_total: number;
+};
+
+// rpc_device_init 반환 row 타입(권장 스펙)
+type DeviceInitRow = {
+  id: string;
+  device_id: string;
+  platform: string | null;
+  last_seen_at: string;
+  created_at: string;
+};
+
 Deno.serve(async (req) => {
   // 1. 입력 파싱
   if (req.method !== 'POST') {
@@ -115,6 +133,20 @@ Deno.serve(async (req) => {
   }
 
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  {
+    const { data: initData, error: initError } = await supabaseAdmin.rpc('rpc_device_init', {
+      device_id: device_id,
+      platform: body.platform || null,
+    });
+
+    const initRow = (Array.isArray(initData) ? initData[0] : initData) as DeviceInitRow | undefined;
+
+    if (initError || !initRow?.device_id) {
+      reportError('DEVICE_INIT_FAILED', initError, { device_id, platform: body.platform || null });
+      return fail(500, 'DEVICE_INIT_FAILED', '디바이스 초기화에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    }
+  }
 
   let analyzeWithOpenAI: ((text: string, ctx: OpenAIContext) => Promise<unknown>) | null = null;
   try {
@@ -167,7 +199,7 @@ Deno.serve(async (req) => {
   const { data, error } = await supabaseAdmin.rpc('use_analysis_once', { p_device_id: device_id });
   const row = Array.isArray(data) ? data[0] : data;
 
-  if (error || !row?.success) {
+  if (error || !row?.allowed) {
     return fail(403, 'USAGE_LIMIT_EXCEEDED', '오늘 사용 가능 횟수를 모두 사용했어요.');
   }
 
@@ -178,7 +210,8 @@ Deno.serve(async (req) => {
     usage: {
       remaining_free: row.remaining_free,
       remaining_rewarded: row.remaining_rewarded,
-      used_type: row.used_type,
+      remaining_total: row.remaining_total,
+      used_from: row.used_from,
     },
   });
 });
