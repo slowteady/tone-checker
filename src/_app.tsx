@@ -13,7 +13,6 @@ Sentry.init({
   dsn: import.meta.env.SENTRY_DSN,
   enableNative: false,
   environment: __DEV__ ? 'development' : 'production',
-  enabled: !__DEV__,
   tracesSampleRate: __DEV__ ? 1.0 : 0.2,
   replaysSessionSampleRate: 0.3,
 });

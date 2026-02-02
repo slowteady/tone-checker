@@ -64,21 +64,21 @@ export const ToneCheckerV2Zod = z.object({
           'low_misinterpretation_risk',
         ]),
         level: z.enum(['low', 'medium', 'high']),
-        reason: z.string().min(1).max(30),
-        evidence: z.string().min(1).max(30),
+        reason: z.string(),
+        evidence: z.string(),
       })
     )
     .max(3),
   suggestions: z
     .array(
       z.object({
-        label: z.string().min(1).max(20),
-        description: z.string().min(1).max(50),
-        example: z.string().min(1).max(120),
+        label: z.string(),
+        description: z.string(),
+        example: z.string(),
       })
     )
     .length(3),
-  warnings: z.array(z.string().min(1).max(50)).max(3),
+  warnings: z.array(z.string()),
 });
 
 export type ToneCheckerV2Result = z.infer<typeof ToneCheckerV2Zod>;

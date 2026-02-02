@@ -169,8 +169,8 @@ export const TONE_CHECKER_V2_SCHEMA = {
           ],
         },
         level: { type: 'string', enum: ['low', 'medium', 'high'] },
-        reason: { type: 'string', minLength: 1, maxLength: 30 },
-        evidence: { type: 'string', minLength: 1, maxLength: 30 },
+        reason: { type: 'string', minLength: 1, maxLength: 60 },
+        evidence: { type: 'string', minLength: 1, maxLength: 60 },
       },
     },
 
