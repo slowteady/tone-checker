@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "granite dev",
     "build": "granite build",
+    "build:dev": "granite build --dev",
     "test": "jest --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

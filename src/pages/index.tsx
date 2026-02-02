@@ -15,13 +15,16 @@ import { colors } from '@toss/tds-colors';
 import { RELATIONSHIP_OPTIONS, SITUATION_OPTIONS, type Relationship, type Situation } from 'constants/params';
 import { getDeviceId } from '@apps-in-toss/framework';
 import { useFormStore } from 'stores/form';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useRemainingUsage } from 'hooks/useRemainingUsage';
 import { AdBottomSheet } from 'components/AdBottomSheet';
 import { UsageLimitNotice } from 'components/UsageLimitNotice';
 import { ErrorResult } from 'components/ErrorResult';
 import { useAdStore } from 'stores/ad';
 import { useResultStore } from 'stores/result';
+import { AnalysisBottomSheet } from 'components/AnalysisBottomSheet';
+import { ENDPOINT } from 'constants/endpoint';
+import { getRemainingUsage } from 'api/usage';
 
 export const Route = createRoute('/', {
   component: Page,
@@ -55,6 +58,7 @@ function Page() {
 function Home({ deviceId }: { deviceId: string }) {
   const [toast, setToast] = useState({ open: false, message: '' });
   const [adBottomSheetOpen, setAdBottomSheetOpen] = useState(false);
+  const [analysisBottomSheetOpen, setAnalysisBottomSheetOpen] = useState(false);
 
   const relationship = useFormStore((s) => s.relationship);
   const situation = useFormStore((s) => s.situation);
@@ -68,27 +72,29 @@ function Home({ deviceId }: { deviceId: string }) {
   const resetForm = useFormStore((s) => s.reset);
   const clearResult = useResultStore((s) => s.clearResult);
 
+  const qc = useQueryClient();
   const navigation = useNavigation();
   const { data } = useSuspenseQuery({ ...useRemainingUsage(deviceId) });
 
   const remainingTotal = data.remaining_total;
+  const hasLimit = data.has_limit;
   const rewardChargeRemaining = data.reward_charge_remaining;
   const isChargeable = remainingTotal === 0 && rewardChargeRemaining > 0;
 
   const executeAnalyze = useCallback(() => {
     const isTextTooShort = text.length < 20;
 
+    Keyboard.dismiss();
+
     if (isChargeable) {
       setAdBottomSheetOpen(true);
       return;
     }
-
     if (isTextTooShort) {
       setToast({ open: true, message: '최소 20자 이상 입력해주세요.' });
       return;
     }
-
-    navigation.push('/loading');
+    setAnalysisBottomSheetOpen(true);
   }, [text, navigation]);
 
   useEffect(() => {
@@ -106,14 +112,22 @@ function Home({ deviceId }: { deviceId: string }) {
   useEffect(() => {
     setDeviceId(deviceId);
 
-    const onFocus = () => {
+    const queryKey = [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] as const;
+
+    const onFocus = async () => {
+      try {
+        await qc.fetchQuery({
+          queryKey,
+          queryFn: () => getRemainingUsage(deviceId),
+        });
+      } catch {
+        qc.invalidateQueries({ queryKey });
+      }
       clearResult?.();
     };
 
     const unsubscribeFocus = navigation.addListener('focus', onFocus);
-    const unsubscribe = navigation.addListener('blur', () => {
-      Keyboard.dismiss();
-    });
+    const unsubscribe = navigation.addListener('blur', () => Keyboard.dismiss());
 
     if (navigation.isFocused && navigation.isFocused()) {
       onFocus();
@@ -221,7 +235,7 @@ function Home({ deviceId }: { deviceId: string }) {
             </View>
           </View>
 
-          <FixedBottomCTA onPress={executeAnalyze} disabled={!isChargeable}>
+          <FixedBottomCTA onPress={executeAnalyze} disabled={hasLimit}>
             <Txt typography="t6" fontWeight="bold" color={colors.white}>
               분석하기
             </Txt>
@@ -244,7 +258,18 @@ function Home({ deviceId }: { deviceId: string }) {
         rewardChargeRemaining={rewardChargeRemaining}
         open={adBottomSheetOpen}
         onClose={() => setAdBottomSheetOpen(false)}
-        onFailedToShow={() => setToast({ open: true, message: '광고 로드에 실패했습니다. 다시 시도해주세요.' })}
+        onFailedToShow={() => {
+          setAdBottomSheetOpen(false);
+          setToast({ open: true, message: '광고 로드에 실패했습니다. 다시 시도해주세요.' });
+        }}
+      />
+      <AnalysisBottomSheet
+        open={analysisBottomSheetOpen}
+        onClose={() => setAnalysisBottomSheetOpen(false)}
+        onAnalyze={() => {
+          setAnalysisBottomSheetOpen(false);
+          navigation.push('/loading');
+        }}
       />
     </>
   );

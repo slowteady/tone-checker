@@ -4,7 +4,7 @@ import { Asset, BottomSheet, Button, colors, Txt } from '@toss/tds-react-native'
 import { rewardOnce } from 'api/usage';
 import { ENDPOINT } from 'constants/endpoint';
 import { useCallback } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useAdStore } from 'stores/ad';
 
 export interface AdBottomSheetProps {
@@ -36,31 +36,39 @@ export const AdBottomSheet = ({
       return;
     }
 
+    const queryKey = [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] as const;
+
     showAd({
       onUserEarnedReward: async () => {
         try {
           await rewardOnce(deviceId);
-          await qc.invalidateQueries({ queryKey: [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] });
-          await qc.refetchQueries({ queryKey: [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId], exact: true });
+
+          await qc.invalidateQueries({ queryKey });
+          await qc.refetchQueries({ queryKey, type: 'active' });
+
           onClose();
         } catch {
-          qc.invalidateQueries({ queryKey: [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] });
+          await qc.invalidateQueries({ queryKey });
+          await qc.refetchQueries({ queryKey, type: 'active' });
+
           onClose();
         }
       },
-      onDismissed: () => {
-        qc.invalidateQueries({ queryKey: [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] });
+      onDismissed: async () => {
+        await qc.invalidateQueries({ queryKey });
+        await qc.refetchQueries({ queryKey, type: 'active' });
+
         onClose();
       },
     });
-  }, []);
+  }, [adLoadStatus, deviceId, onClose, onFailedToShow, qc, showAd]);
 
   return (
     <>
       <BottomSheet.Root
         open={open}
         onClose={onClose}
-        header={<BottomSheet.Header>광고 보고 1회 더 사용할까요?</BottomSheet.Header>}
+        header={<BottomSheet.Header>광고 보고 1회 충전할까요?</BottomSheet.Header>}
         headerDescription={
           <BottomSheet.HeaderDescription>광고 시청 후 분석 횟수 1회가 추가돼요.</BottomSheet.HeaderDescription>
         }
@@ -80,6 +88,12 @@ export const AdBottomSheet = ({
         }
         wrapperProps={{ contentContainerStyle: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 } }}
       >
+        <View style={[styles.chip, { marginBottom: 12 }]}>
+          <Txt typography="st12" fontWeight="bold" color={colors.grey500}>
+            {`오늘 충전 가능 횟수: ${rewardChargeRemaining} / ${LIMIT_COUNT}`}
+          </Txt>
+        </View>
+
         <View style={{ backgroundColor: colors.grey50, borderRadius: 16, padding: 16 }}>
           <Stack direction="horizontal" align="center" gutter={16}>
             <Asset.Icon
@@ -107,3 +121,13 @@ export const AdBottomSheet = ({
     </>
   );
 };
+
+const styles = StyleSheet.create({
+  chip: {
+    backgroundColor: colors.grey100,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 9999,
+    alignSelf: 'baseline',
+  },
+});

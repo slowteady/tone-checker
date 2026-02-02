@@ -24,13 +24,12 @@ function Page() {
   const situation = useFormStore((s) => s.situation);
   const text = useFormStore((s) => s.text);
 
-  const qc = useQueryClient();
-
   const setAnalysisResult = useResultStore((s) => s.setAnalysisResult);
   const adLoadStatus = useAdStore((s) => s.adLoadStatus);
   const showAd = useAdStore((s) => s.showAd);
   const resetForm = useFormStore((s) => s.reset);
 
+  const qc = useQueryClient();
   const overlay = useOverlay();
   const backEvent = useBackEvent();
   const navigation = useNavigation();
@@ -49,7 +48,7 @@ function Page() {
         situation,
         platform: Platform.OS,
       }),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setAnalysisResult(data);
       qc.invalidateQueries({ queryKey: [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] });
       if (isAdDismissed) moveToResult();

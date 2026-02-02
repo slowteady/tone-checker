@@ -10,4 +10,8 @@ export const useRemainingUsage = (deviceId: string) => ({
   enabled: !!deviceId,
   refetchOnMount: true,
   refetchOnWindowFocus: true,
+  refetchOnReconnect: true,
+  retry: 1,
+  staleTime: 0,
+  gcTime: 0,
 });
