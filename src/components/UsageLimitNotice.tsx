@@ -3,7 +3,11 @@ import { colors } from '@toss/tds-colors';
 import { Button, Txt } from '@toss/tds-react-native';
 import { StyleSheet } from 'react-native';
 
-export const UsageLimitNotice = ({ onWatchAd }: { onWatchAd: () => void }) => {
+export interface UsageLimitNoticeProps {
+  onWatchAd: () => void;
+}
+
+export const UsageLimitNotice = ({ onWatchAd }: UsageLimitNoticeProps) => {
   return (
     <Flex direction="row" align="center" justify="space-between" style={styles.container}>
       <Txt

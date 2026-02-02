@@ -87,7 +87,7 @@ export async function analyzeWithOpenAI(text: string, ctx: Context): Promise<unk
   try {
     const res = await client.responses.create(
       {
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-mini',
         max_output_tokens: 1000,
         input: [
           { role: 'system', content: SYSTEM_MESSAGE },

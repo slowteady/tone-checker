@@ -74,6 +74,10 @@ export const usageInfoSchema = z.object({
    */
   remaining_total: z.number(),
   /**
+   * 보상형 광고 충전 남은 횟수
+   */
+  reward_charge_remaining: z.number(),
+  /**
    * 제한 여부
    */
   has_limit: z.boolean(),
@@ -116,27 +120,6 @@ export const analyzeRequestSchema = z.object({
 });
 export type AnalyzeRequestDto = z.infer<typeof analyzeRequestSchema>;
 
-export const analyzeResponseSchema = z.object({
-  /**
-   * 분석 성공 여부
-   */
-  ok: z.boolean(),
-  /**
-   * 분석 결과 또는 에러
-   */
-  data: z.unknown().optional(),
-  /**
-   * 에러 정보
-   */
-  error: z
-    .object({
-      code: z.string(),
-      message: z.string(),
-    })
-    .optional(),
-});
-export type AnalyzeResponseDto = z.infer<typeof analyzeResponseSchema>;
-
 export const categoryScoreItemSchema = z.object({
   score: z.number(),
   comment: z.string(),
@@ -152,3 +135,60 @@ export type CategoryScoreItemDto = z.infer<typeof categoryScoreItemSchema>;
 
 export const categoryScoresSchema = z.record(z.string(), categoryScoreItemSchema);
 export type CategoryScoresDto = z.infer<typeof categoryScoresSchema>;
+
+export const usageResultSchema = z.object({
+  /**
+   * 무료 남은 횟수
+   */
+  remaining_free: z.number(),
+  /**
+   * 보상형 남은 횟수
+   */
+  remaining_rewarded: z.number(),
+  /**
+   * 총 남은 횟수
+   */
+  remaining_total: z.number(),
+  /**
+   * 사용된 횟수 출처
+   */
+  used_from: z.enum(['free_used', 'rewarded_used']),
+});
+export type UsageResultDto = z.infer<typeof usageResultSchema>;
+
+export const suggestionSchema = z.object({
+  label: z.string(),
+  description: z.string(),
+  example: z.string(),
+});
+export type SuggestionDto = z.infer<typeof suggestionSchema>;
+
+export const signalSchema = z.object({
+  category: z.string(),
+  sub_category: z.string(),
+  level: z.string(),
+  reason: z.string(),
+  evidence: z.string(),
+});
+export type SignalDto = z.infer<typeof signalSchema>;
+
+export const analyzeResponseSchema = z.object({
+  ok: z.boolean(),
+  data: z.object({
+    overall_score: z.number(),
+    summary: z.string(),
+    category_scores: categoryScoresSchema,
+    signals: z.array(signalSchema),
+    suggestions: z.array(suggestionSchema),
+    warnings: z.array(z.string()),
+    accuracy_warning: z.boolean(),
+    usage: usageResultSchema,
+  }),
+  error: z
+    .object({
+      code: z.string(),
+      message: z.string(),
+    })
+    .optional(),
+});
+export type AnalyzeResponseDto = z.infer<typeof analyzeResponseSchema>;

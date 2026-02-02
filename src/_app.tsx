@@ -6,6 +6,8 @@ import { TDSProvider } from '@toss/tds-react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Sentry from '@sentry/react-native';
+import { ErrorResult } from 'components/ErrorResult';
+import { useDeviceInit } from 'hooks/useDeviceInit';
 
 Sentry.init({
   dsn: import.meta.env.SENTRY_DSN,
@@ -34,9 +36,15 @@ const queryClient = new QueryClient({
 });
 
 function AppContainer({ children }: PropsWithChildren<InitialProps>) {
+  useDeviceInit();
+
   return (
     <QueryClientProvider client={queryClient}>
-      <TDSProvider>{children}</TDSProvider>
+      <TDSProvider>
+        <Sentry.ErrorBoundary fallback={({ resetError }) => <ErrorResult onRetry={resetError} />}>
+          {children}
+        </Sentry.ErrorBoundary>
+      </TDSProvider>
     </QueryClientProvider>
   );
 }

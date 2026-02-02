@@ -1,20 +1,23 @@
 import { colors } from '@toss/tds-colors';
-import { createRoute, Flex } from '@granite-js/react-native';
+import { createRoute, Flex, useNavigation } from '@granite-js/react-native';
 import { StyleSheet, View } from 'react-native';
 import { Border, BottomInfo, FixedBottomCTA, FixedBottomCTAProvider, Post, Txt } from '@toss/tds-react-native';
-import mockData from 'mock/signals.json';
 import { Progressbar } from 'components/Progressbar';
 import { SignalCard } from 'components/SignalCard';
 import { categoryScoresDetailsMap, categoryScoresMap } from 'constants/categoryScoresMap';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ResultCard } from 'components/ResultCard';
+import { useResultStore } from 'stores/result';
 
 export const Route = createRoute('/result', {
   component: Page,
 });
 
 function Page() {
-  const result = mockData;
+  const result = useResultStore((s) => s.analysisResult)?.data;
+  if (!result) return null;
+
+  const navigation = useNavigation();
 
   const categoryScores = result.category_scores;
   const categoryScoresArray = useMemo(
@@ -31,6 +34,10 @@ function Page() {
       })),
     [categoryScores]
   );
+
+  const navigateToSuggestion = useCallback(() => {
+    navigation.push('/suggestion');
+  }, [navigation]);
 
   const hasWarnings = result.warnings.length > 0;
   const hasSignals = result.signals.length > 0;
@@ -118,7 +125,7 @@ function Page() {
         </Flex>
       </View>
 
-      <FixedBottomCTA>
+      <FixedBottomCTA onPress={navigateToSuggestion}>
         <Txt typography="t6" fontWeight="bold" color={colors.white}>
           개선된 문장 확인하기
         </Txt>

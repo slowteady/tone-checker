@@ -24,10 +24,11 @@ export async function getRemainingUsage(deviceId: string): Promise<UsageInfoDto>
     const row = Array.isArray(data) ? data[0] : data;
 
     return {
-      remaining_free: row.free_remaining,
-      remaining_rewarded: row.reward_use_remaining,
-      remaining_total: row.total_remaining,
-      has_limit: row.total_remaining <= 0,
+      remaining_free: row.free_remaining, // 무료 남은 횟수
+      remaining_rewarded: row.reward_use_remaining, // 보상형 광고 남은 횟수
+      remaining_total: row.total_remaining, // 총 남은 횟수(무료 + 충전된 보상)
+      reward_charge_remaining: row.reward_charge_remaining, // 보상형 광고 충전 남은 횟수
+      has_limit: row.total_remaining <= 0, // 제한 여부
     };
   } catch (error) {
     captureError(error, {

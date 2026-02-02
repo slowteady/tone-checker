@@ -1,16 +1,19 @@
 import { createRoute, useNavigation } from '@granite-js/react-native';
 import { colors, FixedBottomCTA, FixedBottomCTAProvider, Txt } from '@toss/tds-react-native';
 import { StyleSheet, View } from 'react-native';
-import mockData from 'mock/signals.json';
 import { CopyCard } from 'components/CopyCard';
+import { useResultStore } from 'stores/result';
 
 export const Route = createRoute('/suggestion', {
   component: Page,
 });
 
 function Page() {
+  const result = useResultStore((s) => s.analysisResult)?.data;
+  if (!result) return null;
+
   const navigation = useNavigation();
-  const suggestions = mockData.suggestions;
+  const suggestions = result.suggestions;
 
   return (
     <FixedBottomCTAProvider>

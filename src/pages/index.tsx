@@ -19,32 +19,13 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { useRemainingUsage } from 'hooks/useRemainingUsage';
 import { AdBottomSheet } from 'components/AdBottomSheet';
 import { UsageLimitNotice } from 'components/UsageLimitNotice';
-import { useLoadAd } from 'hooks/useLoadAd';
 import { ErrorResult } from 'components/ErrorResult';
+import { useAdStore } from 'stores/ad';
+import { useResultStore } from 'stores/result';
 
 export const Route = createRoute('/', {
   component: Page,
 });
-
-// TODO
-// 1. 루트 페이지
-// [x] 남은 횟수 조회
-// [x] 횟수 있을 때, 전면 광고 preload 처리
-// [x] 횟수 없을 때, 보상형 광고 preload 처리
-// [ ] 분석하기 버튼 클릭하면 광고 꺼내고 /loading 페이지 이동
-
-// 2. loading 페이지
-// [ ] 전면 광고 출력
-// [ ] 데이터 패칭 후에 스토어에 담고 /result 페이지 이동
-
-// 3. result 페이지
-// [ ] 스토어에서 데이터 가져와서 뿌려주기
-// [ ] UI 구현
-// [ ] 개선된 문장 확인하기 버튼 클릭하면 /suggestion 페이지 이동
-
-// 4. suggestion 페이지
-// [ ] 스토어에서 데이터 가져와서 뿌려주기
-// [ ] 홈으로 돌아가기 버튼 클릭하면 루트 페이지 이동
 
 function Page() {
   const [hasError, setHasError] = useState(false);
@@ -72,32 +53,38 @@ function Page() {
 }
 
 function Home({ deviceId }: { deviceId: string }) {
+  const [toast, setToast] = useState({ open: false, message: '' });
+  const [adBottomSheetOpen, setAdBottomSheetOpen] = useState(false);
+
   const relationship = useFormStore((s) => s.relationship);
   const situation = useFormStore((s) => s.situation);
   const text = useFormStore((s) => s.text);
 
+  const loadAd = useAdStore((s) => s.loadAd);
   const setDeviceId = useFormStore((s) => s.setDeviceId);
   const setRelationship = useFormStore((s) => s.setRelationship);
   const setSituation = useFormStore((s) => s.setSituation);
   const setText = useFormStore((s) => s.setText);
   const resetForm = useFormStore((s) => s.reset);
+  const clearResult = useResultStore((s) => s.clearResult);
 
-  const [toastOpen, setToastOpen] = useState(false);
-  const [adBottomSheetOpen, setAdBottomSheetOpen] = useState(false);
   const navigation = useNavigation();
-
   const { data } = useSuspenseQuery({ ...useRemainingUsage(deviceId) });
 
-  const hasLimit = data.has_limit;
   const remainingTotal = data.remaining_total;
-
-  useLoadAd(hasLimit ? import.meta.env.DISPLAY_AD_DEV_ID : import.meta.env.REWARD_AD_DEV_ID);
+  const rewardChargeRemaining = data.reward_charge_remaining;
+  const isChargeable = remainingTotal === 0 && rewardChargeRemaining > 0;
 
   const executeAnalyze = useCallback(() => {
     const isTextTooShort = text.length < 20;
 
+    if (isChargeable) {
+      setAdBottomSheetOpen(true);
+      return;
+    }
+
     if (isTextTooShort) {
-      setToastOpen(true);
+      setToast({ open: true, message: '최소 20자 이상 입력해주세요.' });
       return;
     }
 
@@ -105,13 +92,37 @@ function Home({ deviceId }: { deviceId: string }) {
   }, [text, navigation]);
 
   useEffect(() => {
+    const adGroupId = __DEV__
+      ? isChargeable
+        ? import.meta.env.REWARD_AD_DEV_ID
+        : import.meta.env.DISPLAY_AD_DEV_ID
+      : isChargeable
+        ? import.meta.env.REWARD_AD_ID
+        : import.meta.env.DISPLAY_AD_ID;
+
+    loadAd(adGroupId);
+  }, [isChargeable, loadAd]);
+
+  useEffect(() => {
     setDeviceId(deviceId);
 
+    const onFocus = () => {
+      clearResult?.();
+    };
+
+    const unsubscribeFocus = navigation.addListener('focus', onFocus);
     const unsubscribe = navigation.addListener('blur', () => {
       Keyboard.dismiss();
     });
 
-    return unsubscribe;
+    if (navigation.isFocused && navigation.isFocused()) {
+      onFocus();
+    }
+
+    return () => {
+      unsubscribeFocus();
+      unsubscribe();
+    };
   }, [navigation, resetForm, setDeviceId, deviceId]);
 
   return (
@@ -137,7 +148,7 @@ function Home({ deviceId }: { deviceId: string }) {
             </Txt>
           </Flex>
 
-          {hasLimit && (
+          {isChargeable && (
             <View style={{ marginBottom: 24 }}>
               <UsageLimitNotice onWatchAd={() => setAdBottomSheetOpen(true)} />
             </View>
@@ -210,7 +221,7 @@ function Home({ deviceId }: { deviceId: string }) {
             </View>
           </View>
 
-          <FixedBottomCTA onPress={executeAnalyze} disabled={hasLimit}>
+          <FixedBottomCTA onPress={executeAnalyze} disabled={!isChargeable}>
             <Txt typography="t6" fontWeight="bold" color={colors.white}>
               분석하기
             </Txt>
@@ -218,17 +229,23 @@ function Home({ deviceId }: { deviceId: string }) {
         </View>
       </FixedBottomCTAProvider>
 
-      {toastOpen && (
+      {toast.open && (
         <Toast
-          open={toastOpen}
-          onClose={() => setToastOpen(false)}
+          open={toast.open}
+          onClose={() => setToast({ open: false, message: '' })}
           position="bottom"
-          text="최소 20자 이상 입력해주세요."
+          text={toast.message}
           icon={<Toast.LottieIcon preset type="error" />}
         />
       )}
 
-      <AdBottomSheet open={adBottomSheetOpen} onClose={() => setAdBottomSheetOpen(false)} />
+      <AdBottomSheet
+        deviceId={deviceId}
+        rewardChargeRemaining={rewardChargeRemaining}
+        open={adBottomSheetOpen}
+        onClose={() => setAdBottomSheetOpen(false)}
+        onFailedToShow={() => setToast({ open: true, message: '광고 로드에 실패했습니다. 다시 시도해주세요.' })}
+      />
     </>
   );
 }
