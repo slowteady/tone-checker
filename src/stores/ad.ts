@@ -86,12 +86,21 @@ export const useAdStore = create<AdStore>((set, get) => ({
   showAd: (callbacks?: AdCallbacks) => {
     const state = get();
 
+    if (state.adShowState !== 'idle') {
+      return;
+    }
+
     if (state.adLoadStatus !== 'loaded') {
       callbacks?.onDismissed?.();
       return;
     }
 
     if (!state.currentAdGroupId) {
+      callbacks?.onDismissed?.();
+      return;
+    }
+
+    if (state.isAdConsumed) {
       callbacks?.onDismissed?.();
       return;
     }
@@ -110,14 +119,17 @@ export const useAdStore = create<AdStore>((set, get) => ({
 
         switch (event.type) {
           case 'dismissed':
-            set({ adShowState: 'idle' });
+            set({ adShowState: 'idle', adLoadStatus: 'not_loaded' });
             callbacks?.onDismissed?.();
             get().cleanupAd();
             break;
+
           case 'failedToShow':
-            set({ adShowState: 'idle' });
+            set({ adShowState: 'idle', adLoadStatus: 'not_loaded' });
             callbacks?.onDismissed?.();
+            get().cleanupAd();
             break;
+
           case 'userEarnedReward':
             callbacks?.onUserEarnedReward?.();
             break;
@@ -128,8 +140,9 @@ export const useAdStore = create<AdStore>((set, get) => ({
           location: 'AdStore/showAd',
           tags: { feature: 'ad' },
         });
-        set({ adShowState: 'idle' });
+        set({ adShowState: 'idle', adLoadStatus: 'not_loaded' });
         callbacks?.onDismissed?.();
+        get().cleanupAd();
       },
     });
   },

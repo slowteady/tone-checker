@@ -9,7 +9,7 @@ import {
   Toast,
   Txt,
 } from '@toss/tds-react-native';
-import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Keyboard, StyleSheet, View } from 'react-native';
 import { colors } from '@toss/tds-colors';
 import { RELATIONSHIP_OPTIONS, SITUATION_OPTIONS, type Relationship, type Situation } from 'constants/params';
@@ -64,22 +64,82 @@ function Home({ deviceId }: { deviceId: string }) {
   const situation = useFormStore((s) => s.situation);
   const text = useFormStore((s) => s.text);
 
-  const loadAd = useAdStore((s) => s.loadAd);
   const setDeviceId = useFormStore((s) => s.setDeviceId);
   const setRelationship = useFormStore((s) => s.setRelationship);
   const setSituation = useFormStore((s) => s.setSituation);
   const setText = useFormStore((s) => s.setText);
-  const resetForm = useFormStore((s) => s.reset);
+
+  const loadAd = useAdStore((s) => s.loadAd);
+
   const clearResult = useResultStore((s) => s.clearResult);
 
   const qc = useQueryClient();
   const navigation = useNavigation();
+
+  const queryKey = useMemo(() => [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] as const, [deviceId]);
+
   const { data } = useSuspenseQuery({ ...useRemainingUsage(deviceId) });
 
   const remainingTotal = data.remaining_total;
   const hasLimit = data.has_limit;
   const rewardChargeRemaining = data.reward_charge_remaining;
+
   const isChargeable = remainingTotal === 0 && rewardChargeRemaining > 0;
+
+  const adGroupId = useMemo(() => {
+    return __DEV__
+      ? isChargeable
+        ? import.meta.env.REWARD_AD_DEV_ID
+        : import.meta.env.DISPLAY_AD_DEV_ID
+      : isChargeable
+        ? import.meta.env.REWARD_AD_ID
+        : import.meta.env.DISPLAY_AD_ID;
+  }, [isChargeable]);
+
+  useEffect(() => {
+    loadAd(adGroupId);
+  }, [adGroupId, loadAd]);
+
+  // ✅ 2) focus 시: 횟수 + 광고 모두 확실히 최신화
+  useEffect(() => {
+    setDeviceId(deviceId);
+
+    const hardRefreshUsage = async () => {
+      // (A) 광고는 포커스 때 한 번 더 준비
+      loadAd(adGroupId);
+
+      // (B) usage는 "실제로" 갱신 보장
+      try {
+        await qc.fetchQuery({
+          queryKey,
+          queryFn: () => getRemainingUsage(deviceId),
+        });
+      } catch {
+        // invalidate만 하면 UI가 안 바뀌는 케이스가 있어서 refetch까지 강제
+        qc.invalidateQueries({ queryKey });
+        try {
+          await qc.refetchQueries({ queryKey, exact: true });
+        } catch {
+          // 여기서 더 할 건 없음 (네트워크 실패 등)
+        }
+      }
+
+      clearResult?.();
+    };
+
+    const unsubscribeFocus = navigation.addListener('focus', hardRefreshUsage);
+    const unsubscribeBlur = navigation.addListener('blur', () => Keyboard.dismiss());
+
+    // 이미 focus 상태면 즉시 갱신
+    if (navigation.isFocused && navigation.isFocused()) {
+      hardRefreshUsage();
+    }
+
+    return () => {
+      unsubscribeFocus();
+      unsubscribeBlur();
+    };
+  }, [navigation, setDeviceId, deviceId, qc, queryKey, clearResult, loadAd, adGroupId]);
 
   const executeAnalyze = useCallback(() => {
     const isTextTooShort = text.length < 20;
@@ -95,49 +155,7 @@ function Home({ deviceId }: { deviceId: string }) {
       return;
     }
     setAnalysisBottomSheetOpen(true);
-  }, [text, navigation]);
-
-  useEffect(() => {
-    const adGroupId = __DEV__
-      ? isChargeable
-        ? import.meta.env.REWARD_AD_DEV_ID
-        : import.meta.env.DISPLAY_AD_DEV_ID
-      : isChargeable
-        ? import.meta.env.REWARD_AD_ID
-        : import.meta.env.DISPLAY_AD_ID;
-
-    loadAd(adGroupId);
-  }, [isChargeable, loadAd]);
-
-  useEffect(() => {
-    setDeviceId(deviceId);
-
-    const queryKey = [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] as const;
-
-    const onFocus = async () => {
-      try {
-        await qc.fetchQuery({
-          queryKey,
-          queryFn: () => getRemainingUsage(deviceId),
-        });
-      } catch {
-        qc.invalidateQueries({ queryKey });
-      }
-      clearResult?.();
-    };
-
-    const unsubscribeFocus = navigation.addListener('focus', onFocus);
-    const unsubscribe = navigation.addListener('blur', () => Keyboard.dismiss());
-
-    if (navigation.isFocused && navigation.isFocused()) {
-      onFocus();
-    }
-
-    return () => {
-      unsubscribeFocus();
-      unsubscribe();
-    };
-  }, [navigation, resetForm, setDeviceId, deviceId]);
+  }, [text, isChargeable]);
 
   return (
     <>

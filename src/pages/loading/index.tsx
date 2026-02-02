@@ -16,30 +16,38 @@ export const Route = createRoute('/loading', {
 });
 
 function Page() {
-  const [isAdDismissed, setIsAdDismissed] = useState(false);
-  const hasFetched = useRef(false);
-
   const deviceId = useFormStore((s) => s.deviceId);
   const relationship = useFormStore((s) => s.relationship);
   const situation = useFormStore((s) => s.situation);
   const text = useFormStore((s) => s.text);
+  const resetForm = useFormStore((s) => s.reset);
 
   const setAnalysisResult = useResultStore((s) => s.setAnalysisResult);
+
   const adLoadStatus = useAdStore((s) => s.adLoadStatus);
   const showAd = useAdStore((s) => s.showAd);
-  const resetForm = useFormStore((s) => s.reset);
 
   const qc = useQueryClient();
   const overlay = useOverlay();
   const backEvent = useBackEvent();
   const navigation = useNavigation();
 
+  const hasMovedRef = useRef(false);
+
   const moveToResult = useCallback(() => {
+    if (hasMovedRef.current) return;
+    hasMovedRef.current = true;
+
     resetForm();
     navigation.replace('/result');
   }, [resetForm, navigation]);
 
-  const { mutate, isSuccess } = useMutation({
+  const [analysisDone, setAnalysisDone] = useState(false);
+  const [adDone, setAdDone] = useState(false);
+
+  const hasTriedShowAdRef = useRef(false);
+
+  const { mutate } = useMutation({
     mutationFn: () =>
       analyzeTone({
         device_id: deviceId,
@@ -51,7 +59,8 @@ function Page() {
     onSuccess: async (data) => {
       setAnalysisResult(data);
       qc.invalidateQueries({ queryKey: [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] });
-      if (isAdDismissed) moveToResult();
+
+      setAnalysisDone(true);
     },
     throwOnError: true,
   });
@@ -100,46 +109,46 @@ function Page() {
   }, [overlay]);
 
   useEffect(() => {
-    if (openConfirmDialog != null) {
-      backEvent.addEventListener(openConfirmDialog);
-
-      return () => {
-        backEvent.removeEventListener(openConfirmDialog);
-      };
-    }
-
-    return;
+    backEvent.addEventListener(openConfirmDialog);
+    return () => backEvent.removeEventListener(openConfirmDialog);
   }, [backEvent, openConfirmDialog]);
 
+  // ✅ 1) 분석 요청은 최초 1회만
   useEffect(() => {
-    if (!hasFetched.current) {
-      hasFetched.current = true;
+    mutate();
+  }, [mutate]);
 
-      mutate();
-
-      if (adLoadStatus === 'loaded') {
-        showAd({
-          onDismissed: () => {
-            setIsAdDismissed(true);
-            if (isSuccess) moveToResult();
-          },
-        });
-      } else if (adLoadStatus === 'failed') {
-        setIsAdDismissed(true);
-      }
-    }
-  }, []);
-
+  // ✅ 2) 광고 처리: “뜨면 닫힐 때까지 기다림”, “못 뜨면 즉시 adDone”
   useEffect(() => {
-    if (hasFetched.current && adLoadStatus === 'loaded' && !isAdDismissed) {
+    // 이미 광고 show를 시도했으면 재시도 금지
+    if (hasTriedShowAdRef.current) return;
+
+    // adLoadStatus가 결정되기 전(not_loaded)은 그냥 대기
+    if (adLoadStatus === 'not_loaded') return;
+
+    hasTriedShowAdRef.current = true;
+
+    if (adLoadStatus === 'loaded') {
       showAd({
         onDismissed: () => {
-          setIsAdDismissed(true);
-          if (isSuccess) moveToResult();
+          setAdDone(true);
         },
       });
+      return;
     }
-  }, [adLoadStatus, isAdDismissed, isSuccess, showAd, moveToResult]);
+
+    // failed면 광고를 못 띄운거니까 바로 adDone 처리
+    if (adLoadStatus === 'failed') {
+      setAdDone(true);
+    }
+  }, [adLoadStatus, showAd]);
+
+  // ✅ 3) 이동 조건: (분석 완료 && 광고 완료) -> 이동
+  useEffect(() => {
+    if (analysisDone && adDone) {
+      moveToResult();
+    }
+  }, [analysisDone, adDone, moveToResult]);
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
