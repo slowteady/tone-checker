@@ -4,7 +4,7 @@ CREATE OR REPLACE FUNCTION public.rpc_get_today_status(p_device_id text)
  SECURITY DEFINER
 AS $function$
 DECLARE
-  v_today date := current_date;
+  v_today date := (now() at time zone 'Asia/Seoul')::date;
   v_row public.daily_usage%rowtype;
 BEGIN
   INSERT INTO public.daily_usage (device_id, date)
