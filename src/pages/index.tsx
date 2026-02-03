@@ -17,14 +17,12 @@ import { getDeviceId } from '@apps-in-toss/framework';
 import { useFormStore } from 'stores/form';
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useRemainingUsage } from 'hooks/useRemainingUsage';
-import { AdBottomSheet } from 'components/AdBottomSheet';
 import { UsageLimitNotice } from 'components/UsageLimitNotice';
 import { ErrorResult } from 'components/ErrorResult';
-import { useAdStore } from 'stores/ad';
 import { useResultStore } from 'stores/result';
 import { AnalysisBottomSheet } from 'components/AnalysisBottomSheet';
 import { ENDPOINT } from 'constants/endpoint';
-import { getRemainingUsage } from 'api/usage';
+import { useDeviceIdStore } from 'stores/device';
 
 export const Route = createRoute('/', {
   component: Page,
@@ -38,7 +36,7 @@ function Page() {
     setHasError(false);
   };
 
-  if (!deviceId || hasError) {
+  if (!deviceId || !deviceId.trim() || hasError) {
     return <ErrorResult onRetry={handleRetry} />;
   }
 
@@ -60,16 +58,15 @@ function Home({ deviceId }: { deviceId: string }) {
   const [adBottomSheetOpen, setAdBottomSheetOpen] = useState(false);
   const [analysisBottomSheetOpen, setAnalysisBottomSheetOpen] = useState(false);
 
+  const setDeviceId = useDeviceIdStore((s) => s.setDeviceId);
+
   const relationship = useFormStore((s) => s.relationship);
   const situation = useFormStore((s) => s.situation);
   const text = useFormStore((s) => s.text);
 
-  const setDeviceId = useFormStore((s) => s.setDeviceId);
   const setRelationship = useFormStore((s) => s.setRelationship);
   const setSituation = useFormStore((s) => s.setSituation);
   const setText = useFormStore((s) => s.setText);
-
-  const loadAd = useAdStore((s) => s.loadAd);
 
   const clearResult = useResultStore((s) => s.clearResult);
 
@@ -96,54 +93,13 @@ function Home({ deviceId }: { deviceId: string }) {
         : import.meta.env.DISPLAY_AD_ID;
   }, [isChargeable]);
 
-  useEffect(() => {
-    loadAd(adGroupId);
-  }, [adGroupId, loadAd]);
+  const executeAnalyze = useCallback(async () => {
+    setAnalysisBottomSheetOpen(false);
+    navigation.push('/loading');
+  }, [deviceId, qc, navigation]);
 
-  // ✅ 2) focus 시: 횟수 + 광고 모두 확실히 최신화
-  useEffect(() => {
-    setDeviceId(deviceId);
-
-    const hardRefreshUsage = async () => {
-      // (A) 광고는 포커스 때 한 번 더 준비
-      loadAd(adGroupId);
-
-      // (B) usage는 "실제로" 갱신 보장
-      try {
-        await qc.fetchQuery({
-          queryKey,
-          queryFn: () => getRemainingUsage(deviceId),
-        });
-      } catch {
-        // invalidate만 하면 UI가 안 바뀌는 케이스가 있어서 refetch까지 강제
-        qc.invalidateQueries({ queryKey });
-        try {
-          await qc.refetchQueries({ queryKey, exact: true });
-        } catch {
-          // 여기서 더 할 건 없음 (네트워크 실패 등)
-        }
-      }
-
-      clearResult?.();
-    };
-
-    const unsubscribeFocus = navigation.addListener('focus', hardRefreshUsage);
-    const unsubscribeBlur = navigation.addListener('blur', () => Keyboard.dismiss());
-
-    // 이미 focus 상태면 즉시 갱신
-    if (navigation.isFocused && navigation.isFocused()) {
-      hardRefreshUsage();
-    }
-
-    return () => {
-      unsubscribeFocus();
-      unsubscribeBlur();
-    };
-  }, [navigation, setDeviceId, deviceId, qc, queryKey, clearResult, loadAd, adGroupId]);
-
-  const executeAnalyze = useCallback(() => {
+  const handleAnalyze = useCallback(() => {
     const isTextTooShort = text.length < 20;
-
     Keyboard.dismiss();
 
     if (isChargeable) {
@@ -156,6 +112,10 @@ function Home({ deviceId }: { deviceId: string }) {
     }
     setAnalysisBottomSheetOpen(true);
   }, [text, isChargeable]);
+
+  useEffect(() => {
+    setDeviceId(deviceId);
+  }, [deviceId, setDeviceId]);
 
   return (
     <>
@@ -253,7 +213,7 @@ function Home({ deviceId }: { deviceId: string }) {
             </View>
           </View>
 
-          <FixedBottomCTA onPress={executeAnalyze} disabled={hasLimit}>
+          <FixedBottomCTA onPress={handleAnalyze} disabled={hasLimit}>
             <Txt typography="t6" fontWeight="bold" color={colors.white}>
               분석하기
             </Txt>
@@ -271,7 +231,7 @@ function Home({ deviceId }: { deviceId: string }) {
         />
       )}
 
-      <AdBottomSheet
+      {/* <AdBottomSheet
         deviceId={deviceId}
         rewardChargeRemaining={rewardChargeRemaining}
         open={adBottomSheetOpen}
@@ -280,14 +240,11 @@ function Home({ deviceId }: { deviceId: string }) {
           setAdBottomSheetOpen(false);
           setToast({ open: true, message: '광고 로드에 실패했습니다. 다시 시도해주세요.' });
         }}
-      />
+      /> */}
       <AnalysisBottomSheet
         open={analysisBottomSheetOpen}
         onClose={() => setAnalysisBottomSheetOpen(false)}
-        onAnalyze={() => {
-          setAnalysisBottomSheetOpen(false);
-          navigation.push('/loading');
-        }}
+        onAnalyze={executeAnalyze}
       />
     </>
   );

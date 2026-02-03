@@ -8,10 +8,8 @@ export const useRemainingUsage = (deviceId: string) => ({
   queryKey: [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId],
   queryFn: () => getRemainingUsage(deviceId),
   enabled: !!deviceId,
-  refetchOnMount: true,
   refetchOnWindowFocus: true,
   refetchOnReconnect: true,
   retry: 1,
-  staleTime: 0,
-  gcTime: 0,
+  staleTime: 5_000,
 });

@@ -1,10 +1,9 @@
 import { GoogleAdMob, type ShowAdMobEvent } from '@apps-in-toss/framework';
-import { useFocusEffect } from '@granite-js/native/@react-navigation/native';
 import { useNavigation } from '@granite-js/react-native';
 import { captureError } from 'lib/sentry';
 import { useCallback, useState } from 'react';
 
-export interface UseLoadAdProps {
+export interface UseAdProps {
   adGroupId: string;
   onShowed?: () => void;
   onDismissed?: () => void;
@@ -12,14 +11,14 @@ export interface UseLoadAdProps {
 
 type AdShowState = ShowAdMobEvent['type'] | 'idle';
 
-export const useLoadAd = ({ adGroupId, onShowed, onDismissed }: UseLoadAdProps) => {
+export const useAd = ({ adGroupId, onShowed, onDismissed }: UseAdProps) => {
   const [adLoadStatus, setAdLoadStatus] = useState<'not_loaded' | 'loaded' | 'failed'>('not_loaded');
   const [isAdConsumed, setIsAdConsumed] = useState(false);
   const [adShowState, setAdShowState] = useState<AdShowState>('idle');
 
   const navigation = useNavigation();
 
-  const preloadAd = useCallback(() => {
+  const loadAd = useCallback(() => {
     if (GoogleAdMob.loadAppsInTossAdMob.isSupported() !== true) {
       return;
     }
@@ -42,8 +41,8 @@ export const useLoadAd = ({ adGroupId, onShowed, onDismissed }: UseLoadAdProps) 
       },
       onError: (error) => {
         captureError(error, {
-          location: 'useLoadAd/preloadAd/onError',
-          tags: { feature: 'preload' },
+          location: 'useAd/loadAd/onError',
+          tags: { feature: 'ad' },
         });
         setAdLoadStatus('failed');
       },
@@ -90,7 +89,7 @@ export const useLoadAd = ({ adGroupId, onShowed, onDismissed }: UseLoadAdProps) 
       },
       onError: (error) => {
         captureError(error, {
-          location: 'useLoadAd/showAd/onError',
+          location: 'useAd/showAd/onError',
           tags: { feature: 'ad' },
         });
         onDismissed?.();
@@ -98,7 +97,5 @@ export const useLoadAd = ({ adGroupId, onShowed, onDismissed }: UseLoadAdProps) 
     });
   }, []);
 
-  useFocusEffect(preloadAd);
-
-  return { state: { adLoadStatus, adShowState }, actions: { showAd } };
+  return { state: { adLoadStatus, adShowState }, actions: { loadAd, showAd } };
 };

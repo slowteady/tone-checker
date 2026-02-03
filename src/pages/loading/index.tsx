@@ -1,6 +1,6 @@
 import { createRoute, useNavigation } from '@granite-js/react-native';
 import { ConfirmDialog, Loader, Result } from '@toss/tds-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Platform, View } from 'react-native';
 import { useBackEvent } from '@granite-js/react-native';
 import { useOverlay } from '@apps-in-toss/framework';
@@ -8,15 +8,20 @@ import { useFormStore } from 'stores/form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { analyzeTone } from 'api/analyze';
 import { useResultStore } from 'stores/result';
-import { useAdStore } from 'stores/ad';
 import { ENDPOINT } from 'constants/endpoint';
+import { UsageInfoDto } from 'lib/schema';
+import { useDeviceIdStore } from 'stores/device';
 
 export const Route = createRoute('/loading', {
   component: Page,
 });
 
 function Page() {
-  const deviceId = useFormStore((s) => s.deviceId);
+  const cancelledRef = useRef(false);
+  const startedRef = useRef(false);
+
+  const deviceId = useDeviceIdStore((s) => s.deviceId);
+
   const relationship = useFormStore((s) => s.relationship);
   const situation = useFormStore((s) => s.situation);
   const text = useFormStore((s) => s.text);
@@ -24,28 +29,12 @@ function Page() {
 
   const setAnalysisResult = useResultStore((s) => s.setAnalysisResult);
 
-  const adLoadStatus = useAdStore((s) => s.adLoadStatus);
-  const showAd = useAdStore((s) => s.showAd);
-
   const qc = useQueryClient();
   const overlay = useOverlay();
   const backEvent = useBackEvent();
   const navigation = useNavigation();
 
-  const hasMovedRef = useRef(false);
-
-  const moveToResult = useCallback(() => {
-    if (hasMovedRef.current) return;
-    hasMovedRef.current = true;
-
-    resetForm();
-    navigation.replace('/result');
-  }, [resetForm, navigation]);
-
-  const [analysisDone, setAnalysisDone] = useState(false);
-  const [adDone, setAdDone] = useState(false);
-
-  const hasTriedShowAdRef = useRef(false);
+  const queryKey = [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] as const;
 
   const { mutate } = useMutation({
     mutationFn: () =>
@@ -56,13 +45,51 @@ function Page() {
         situation,
         platform: Platform.OS,
       }),
-    onSuccess: async (data) => {
-      setAnalysisResult(data);
-      qc.invalidateQueries({ queryKey: [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] });
+    onMutate: async () => {
+      // optimistic update
+      await qc.cancelQueries({ queryKey });
+      const previous = qc.getQueryData(queryKey);
 
-      setAnalysisDone(true);
+      qc.setQueryData<UsageInfoDto>(queryKey, (prev) => {
+        if (!prev) return prev;
+
+        const nextTotal = Math.max(prev.remaining_total - 1, 0);
+
+        let nextFree = prev.remaining_free;
+        let nextRewarded = prev.remaining_rewarded;
+
+        if (prev.remaining_free > 0) {
+          nextFree = Math.max(prev.remaining_free - 1, 0);
+        } else if (prev.remaining_rewarded > 0) {
+          nextRewarded = Math.max(prev.remaining_rewarded - 1, 0);
+        }
+
+        return {
+          ...prev,
+          remaining_total: nextTotal,
+          remaining_free: nextFree,
+          remaining_rewarded: nextRewarded,
+          has_limit: nextTotal <= 0,
+        };
+      });
+
+      return { previous };
     },
-    throwOnError: true,
+    onSuccess: async (data) => {
+      if (cancelledRef.current) return;
+
+      setAnalysisResult(data);
+      navigation.replace('/result');
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) {
+        qc.setQueryData(queryKey, ctx.previous);
+      }
+      throw new Error();
+    },
+    onSettled: async () => {
+      await qc.invalidateQueries({ queryKey });
+    },
   });
 
   const openConfirmDialog = useCallback(() => {
@@ -90,6 +117,7 @@ function Page() {
               type="danger"
               pointerEvents="auto"
               onPress={() => {
+                cancelledRef.current = true;
                 navigation.pop();
                 resolve(true);
                 close();
@@ -113,42 +141,17 @@ function Page() {
     return () => backEvent.removeEventListener(openConfirmDialog);
   }, [backEvent, openConfirmDialog]);
 
-  // ✅ 1) 분석 요청은 최초 1회만
   useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
     mutate();
-  }, [mutate]);
 
-  // ✅ 2) 광고 처리: “뜨면 닫힐 때까지 기다림”, “못 뜨면 즉시 adDone”
-  useEffect(() => {
-    // 이미 광고 show를 시도했으면 재시도 금지
-    if (hasTriedShowAdRef.current) return;
-
-    // adLoadStatus가 결정되기 전(not_loaded)은 그냥 대기
-    if (adLoadStatus === 'not_loaded') return;
-
-    hasTriedShowAdRef.current = true;
-
-    if (adLoadStatus === 'loaded') {
-      showAd({
-        onDismissed: () => {
-          setAdDone(true);
-        },
-      });
-      return;
-    }
-
-    // failed면 광고를 못 띄운거니까 바로 adDone 처리
-    if (adLoadStatus === 'failed') {
-      setAdDone(true);
-    }
-  }, [adLoadStatus, showAd]);
-
-  // ✅ 3) 이동 조건: (분석 완료 && 광고 완료) -> 이동
-  useEffect(() => {
-    if (analysisDone && adDone) {
-      moveToResult();
-    }
-  }, [analysisDone, adDone, moveToResult]);
+    return () => {
+      cancelledRef.current = true;
+      resetForm();
+    };
+  }, [mutate, resetForm]);
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
