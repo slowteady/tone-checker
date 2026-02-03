@@ -88,7 +88,7 @@ export async function analyzeWithOpenAI(text: string, ctx: Context): Promise<unk
     const res = await client.responses.create(
       {
         model: 'gpt-4.1-mini',
-        max_output_tokens: 1000,
+        max_output_tokens: 2500,
         input: [
           { role: 'system', content: SYSTEM_MESSAGE },
           { role: 'user', content: userContent },
@@ -112,8 +112,11 @@ export async function analyzeWithOpenAI(text: string, ctx: Context): Promise<unk
 
     // status 방어 (있을 수도/없을 수도)
     const status = (res as { status?: string })?.status;
+    const incomplete = (res as { incomplete_details?: string })?.incomplete_details;
+    const usage = (res as { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } })
+      ?.usage;
     if (status && status !== 'completed') {
-      throw new Error(`OpenAI status not completed: ${status}`);
+      throw new Error(`OpenAI status not completed: ${status}, incomplete: ${incomplete}, usage: ${usage}`);
     }
 
     return extractParsedJson(res);
