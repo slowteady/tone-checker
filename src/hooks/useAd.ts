@@ -9,10 +9,16 @@ export interface UseAdProps {
 type AdShowState = ShowAdMobEvent['type'] | 'idle';
 type AdLoadStatus = 'not_loaded' | 'loaded' | 'failed';
 
+type ShowCallbacks = {
+  onShow?: () => void;
+  onDismissed?: () => void;
+  onReward?: () => void;
+};
+
 export const useAd = ({ adGroupId }: UseAdProps) => {
   const [adLoadStatus, setAdLoadStatus] = useState<AdLoadStatus>('not_loaded');
-  const [isAdConsumed, setIsAdConsumed] = useState(false);
   const [adShowState, setAdShowState] = useState<AdShowState>('idle');
+  const [isAdConsumed, setIsAdConsumed] = useState(false);
 
   const cleanupRef = useRef<null | (() => void)>(null);
 
@@ -25,22 +31,21 @@ export const useAd = ({ adGroupId }: UseAdProps) => {
 
   useEffect(() => cleanup, [cleanup]);
 
-  const loadAd = useCallback(() => {
+  const loadAd = useCallback(async () => {
     if (GoogleAdMob.loadAppsInTossAdMob.isSupported() !== true) {
       setAdLoadStatus('failed');
-      return Promise.resolve('failed');
+      return 'failed' as const;
     }
 
     if (adLoadStatus === 'loaded' && !isAdConsumed) {
-      return Promise.resolve('loaded');
+      return 'loaded' as const;
     }
 
     cleanup();
-
     setAdLoadStatus('not_loaded');
     setIsAdConsumed(false);
 
-    return new Promise((resolve) => {
+    return await new Promise<'loaded' | 'failed'>((resolve) => {
       const c = GoogleAdMob.loadAppsInTossAdMob({
         options: { adGroupId },
         onEvent: (event) => {
@@ -60,26 +65,32 @@ export const useAd = ({ adGroupId }: UseAdProps) => {
     });
   }, [adGroupId, adLoadStatus, isAdConsumed, cleanup]);
 
-  const showAd = useCallback((): Promise<'dismissed' | 'failedToShow' | 'not_supported'> => {
-    if (GoogleAdMob.showAppsInTossAdMob.isSupported() !== true) {
-      return Promise.resolve('not_supported');
-    }
+  const showAd = useCallback(
+    (cb?: ShowCallbacks) => {
+      if (GoogleAdMob.showAppsInTossAdMob.isSupported() !== true) {
+        cb?.onDismissed?.();
+        return;
+      }
 
-    setIsAdConsumed(true);
-    setAdShowState('idle');
+      setIsAdConsumed(true);
+      setAdShowState('idle');
 
-    return new Promise((resolve) => {
       GoogleAdMob.showAppsInTossAdMob({
         options: { adGroupId },
         onEvent: (event) => {
           setAdShowState(event.type);
 
           switch (event.type) {
-            case 'dismissed': // 광고 닫힘
-              resolve('dismissed');
+            case 'show':
+              cb?.onShow?.();
               break;
-            case 'failedToShow': // 광고 보여주기 실패
-              resolve('failedToShow');
+            case 'userEarnedReward':
+              cb?.onReward?.();
+              break;
+            case 'dismissed':
+            case 'failedToShow':
+              cb?.onDismissed?.();
+              setAdShowState('idle');
               break;
             default:
               break;
@@ -87,33 +98,15 @@ export const useAd = ({ adGroupId }: UseAdProps) => {
         },
         onError: (error) => {
           captureError(error, { location: 'useAd/showAd', tags: { feature: 'ad' } });
-          resolve('failedToShow');
+          cb?.onDismissed?.();
         },
       });
-    });
-  }, [adGroupId]);
+    },
+    [adGroupId]
+  );
 
-  return { state: { adLoadStatus, adShowState, isAdConsumed }, actions: { loadAd, showAd, cleanup } };
+  return {
+    state: { adLoadStatus, adShowState, isAdConsumed },
+    actions: { loadAd, showAd, cleanup },
+  };
 };
-
-// switch (event.type) {
-//   case 'show': // 광고 출력
-//     onShowed?.();
-//     break;
-//   case 'requested': // 광고 보여주기 요청 완료
-//     break;
-//   case 'impression': // 광고 노출
-//     break;
-//   case 'clicked': // 광고 클릭
-//     break;
-//   case 'userEarnedReward': // 보상형 광고 보상 획득
-//     break;
-//   case 'dismissed': // 광고 닫힘
-//     onDismissed?.();
-//     setAdShowState('idle');
-//     break;
-//   case 'failedToShow': // 광고 보여주기 실패
-//     onDismissed?.();
-//     setAdShowState('idle');
-//     break;
-// }

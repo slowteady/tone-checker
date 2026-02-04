@@ -9,7 +9,7 @@ import {
   Toast,
   Txt,
 } from '@toss/tds-react-native';
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { Keyboard, StyleSheet, View } from 'react-native';
 import { colors } from '@toss/tds-colors';
 import { RELATIONSHIP_OPTIONS, SITUATION_OPTIONS, type Relationship, type Situation } from 'constants/params';
@@ -19,10 +19,9 @@ import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useRemainingUsage } from 'hooks/useRemainingUsage';
 import { UsageLimitNotice } from 'components/UsageLimitNotice';
 import { ErrorResult } from 'components/ErrorResult';
-import { useResultStore } from 'stores/result';
 import { AnalysisBottomSheet } from 'components/AnalysisBottomSheet';
-import { ENDPOINT } from 'constants/endpoint';
 import { useDeviceIdStore } from 'stores/device';
+import { AdBottomSheet } from 'components/AdBottomSheet';
 
 export const Route = createRoute('/', {
   component: Page,
@@ -68,12 +67,8 @@ function Home({ deviceId }: { deviceId: string }) {
   const setSituation = useFormStore((s) => s.setSituation);
   const setText = useFormStore((s) => s.setText);
 
-  const clearResult = useResultStore((s) => s.clearResult);
-
   const qc = useQueryClient();
   const navigation = useNavigation();
-
-  const queryKey = useMemo(() => [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] as const, [deviceId]);
 
   const { data } = useSuspenseQuery({ ...useRemainingUsage(deviceId) });
 
@@ -82,10 +77,6 @@ function Home({ deviceId }: { deviceId: string }) {
   const rewardChargeRemaining = data.reward_charge_remaining;
 
   const isChargeable = remainingTotal === 0 && rewardChargeRemaining > 0;
-
-  const adGroupId = useMemo(() => {
-    return __DEV__ ? import.meta.env.REWARD_AD_DEV_ID : import.meta.env.REWARD_AD_ID;
-  }, []);
 
   const executeAnalyze = useCallback(async () => {
     setAnalysisBottomSheetOpen(false);
@@ -106,6 +97,11 @@ function Home({ deviceId }: { deviceId: string }) {
     }
     setAnalysisBottomSheetOpen(true);
   }, [text, isChargeable]);
+
+  const failedToShowAd = useCallback(() => {
+    setAdBottomSheetOpen(false);
+    setToast({ open: true, message: '광고 로드에 실패했습니다. 다시 시도해주세요.' });
+  }, []);
 
   useEffect(() => {
     setDeviceId(deviceId);
@@ -225,16 +221,13 @@ function Home({ deviceId }: { deviceId: string }) {
         />
       )}
 
-      {/* <AdBottomSheet
+      <AdBottomSheet
         deviceId={deviceId}
         rewardChargeRemaining={rewardChargeRemaining}
         open={adBottomSheetOpen}
         onClose={() => setAdBottomSheetOpen(false)}
-        onFailedToShow={() => {
-          setAdBottomSheetOpen(false);
-          setToast({ open: true, message: '광고 로드에 실패했습니다. 다시 시도해주세요.' });
-        }}
-      /> */}
+        onFailedToShow={failedToShowAd}
+      />
       <AnalysisBottomSheet
         open={analysisBottomSheetOpen}
         onClose={() => setAnalysisBottomSheetOpen(false)}
