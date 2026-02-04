@@ -32,6 +32,7 @@ function Page() {
   const text = useFormStore((s) => s.text);
   const resetForm = useFormStore((s) => s.reset);
 
+  const clearResult = useResultStore((s) => s.clearResult);
   const setAnalysisResult = useResultStore((s) => s.setAnalysisResult);
 
   const qc = useQueryClient();
@@ -174,6 +175,8 @@ function Page() {
   }, [backEvent, openConfirmDialog]);
 
   useEffect(() => {
+    clearResult();
+
     if (startedRef.current) return;
     startedRef.current = true;
 
