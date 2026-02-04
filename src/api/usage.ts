@@ -28,6 +28,7 @@ export async function getRemainingUsage(deviceId: string): Promise<UsageInfoDto>
       remaining_rewarded: row.reward_use_remaining, // 보상형 광고 남은 횟수
       remaining_total: row.total_remaining, // 총 남은 횟수(무료 + 충전된 보상)
       reward_charge_remaining: row.reward_charge_remaining, // 보상형 광고 충전 남은 횟수
+      rewarded_limit: row.rewarded_limit, // 보상형 광고 제한
       has_limit: row.total_remaining <= 0, // 제한 여부
     };
   } catch (error) {
@@ -59,7 +60,17 @@ export async function rewardOnce(deviceId: string): Promise<RewardResponseDto> {
       throw error;
     }
 
-    const row = Array.isArray(data) ? data[0] : data;
+    // RPC RETURN QUERY는 항상 배열을 반환
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('Invalid response from reward_once RPC');
+    }
+
+    const row = data[0];
+
+    // 충전 실패 케이스 명시적 처리
+    if (!row.rewarded) {
+      throw new Error('REWARD_LIMIT_EXCEEDED');
+    }
 
     return {
       rewarded: row.rewarded,
@@ -69,7 +80,14 @@ export async function rewardOnce(deviceId: string): Promise<RewardResponseDto> {
     captureError(error, {
       location: 'api/rewardOnce/catch',
       tags: { feature: 'usage' },
+      extras: { deviceId },
     });
+
+    // 에러 타입별로 다른 메시지 전달
+    if (error instanceof Error && error.message === 'REWARD_LIMIT_EXCEEDED') {
+      throw error;
+    }
+
     throw new Error('Failed to reward usage');
   }
 }

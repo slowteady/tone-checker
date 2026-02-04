@@ -13,7 +13,7 @@ export const AnalysisBottomSheet = ({ open, onClose, onAnalyze }: AnalysisBottom
       onClose={onClose}
       header={<BottomSheet.Header>분석을 진행할까요?</BottomSheet.Header>}
       headerDescription={
-        <BottomSheet.HeaderDescription>{`분석을 진행하면 분석 횟수 1회가 차감돼요`}</BottomSheet.HeaderDescription>
+        <BottomSheet.HeaderDescription>{`분석을 진행하면 분석 횟수 1회가 차감돼요.`}</BottomSheet.HeaderDescription>
       }
       cta={
         <BottomSheet.CTA.Double
@@ -30,8 +30,16 @@ export const AnalysisBottomSheet = ({ open, onClose, onAnalyze }: AnalysisBottom
         />
       }
     >
+      <Post.Paragraph
+        typography="st11"
+        fontWeight="bold"
+        color={colors.grey700}
+        style={{ marginBottom: 8, paddingBottom: 0 }}
+      >
+        *문장이 길수록 분석 시간이 더 소요될 수 있어요.
+      </Post.Paragraph>
       <Post.Paragraph typography="st11" fontWeight="bold" color={colors.grey700}>
-        *문장이 길수록 분석에 시간이 조금 더 소요될 수 있어요.
+        *광고가 출력될 수 있어요.
       </Post.Paragraph>
     </BottomSheet.Root>
   );

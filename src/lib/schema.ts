@@ -70,6 +70,10 @@ export const usageInfoSchema = z.object({
    */
   remaining_rewarded: z.number(),
   /**
+   * 보상형 광고 제한
+   */
+  rewarded_limit: z.number(),
+  /**
    * 총 남은 횟수
    */
   remaining_total: z.number(),
@@ -153,6 +157,10 @@ export const usageResultSchema = z.object({
    * 사용된 횟수 출처
    */
   used_from: z.enum(['free_used', 'rewarded_used']),
+  /**
+   * 보상형 광고 제한
+   */
+  rewarded_limit: z.number(),
 });
 export type UsageResultDto = z.infer<typeof usageResultSchema>;
 

@@ -3,7 +3,7 @@ import { ConfirmDialog, Loader, Result } from '@toss/tds-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { useBackEvent } from '@granite-js/react-native';
-import { useOverlay } from '@apps-in-toss/framework';
+import { GoogleAdMob, useOverlay } from '@apps-in-toss/framework';
 import { useFormStore } from 'stores/form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { analyzeTone } from 'api/analyze';
@@ -11,19 +11,18 @@ import { useResultStore } from 'stores/result';
 import { ENDPOINT } from 'constants/endpoint';
 import { UsageInfoDto } from 'lib/schema';
 import { useDeviceIdStore } from 'stores/device';
-import { useAd } from 'hooks/useAd';
-import { withTimeout } from 'lib/withTimeout';
+import { captureError } from 'lib/sentry';
 
 export const Route = createRoute('/loading', {
   component: Page,
 });
 
+const AD_TIMEOUT_MS = 5_000;
+
 function Page() {
   const [analysisDone, setAnalysisDone] = useState(false);
-  const [adDone, setAdDone] = useState(false);
-
-  const cancelledRef = useRef(false);
-  const startedRef = useRef(false);
+  const [adDismissed, setAdDismissed] = useState(false);
+  const adTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const deviceId = useDeviceIdStore((s) => s.deviceId);
 
@@ -32,7 +31,6 @@ function Page() {
   const text = useFormStore((s) => s.text);
   const resetForm = useFormStore((s) => s.reset);
 
-  const clearResult = useResultStore((s) => s.clearResult);
   const setAnalysisResult = useResultStore((s) => s.setAnalysisResult);
 
   const qc = useQueryClient();
@@ -41,19 +39,6 @@ function Page() {
   const navigation = useNavigation();
 
   const queryKey = [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] as const;
-
-  const ad = useAd({
-    adGroupId: __DEV__ ? import.meta.env.DISPLAY_AD_DEV_ID : import.meta.env.DISPLAY_AD_ID,
-  });
-
-  const tryMove = useCallback(() => {
-    if (cancelledRef.current) return;
-    if (!analysisDone) return;
-    if (!adDone) return;
-
-    resetForm();
-    navigation.replace('/result');
-  }, [analysisDone, adDone, navigation, resetForm]);
 
   const { mutate } = useMutation({
     mutationFn: () =>
@@ -95,35 +80,98 @@ function Page() {
       return { previous };
     },
     onSuccess: async (data) => {
-      if (cancelledRef.current) return;
-
       setAnalysisResult(data);
       setAnalysisDone(true);
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.previous) qc.setQueryData(queryKey, ctx.previous);
-
+      captureError(_err, { location: 'loading/mutate', tags: { feature: 'analyze' } });
       setAnalysisDone(true);
-      throw new Error();
     },
     onSettled: async () => {
       await qc.invalidateQueries({ queryKey });
     },
   });
 
-  const runAdPipeline = useCallback(async () => {
-    await withTimeout(
-      (async () => {
-        const loadRes = await ad.actions.loadAd();
-        if (loadRes !== 'loaded') return;
-        await ad.actions.showAd();
-      })(),
-      5_000
-    );
+  const loadAndShowAd = useCallback(() => {
+    const adGroupId = __DEV__ ? import.meta.env.DISPLAY_AD_DEV_ID : import.meta.env.DISPLAY_AD_ID;
 
-    ad.actions.cleanup();
-    setAdDone(true);
-  }, [ad.actions]);
+    if (GoogleAdMob.loadAppsInTossAdMob.isSupported() !== true) {
+      setAdDismissed(true);
+      return;
+    }
+
+    let adShown = false;
+
+    adTimeoutRef.current = setTimeout(() => {
+      if (!adShown) setAdDismissed(true);
+    }, AD_TIMEOUT_MS);
+
+    const cleanup = GoogleAdMob.loadAppsInTossAdMob({
+      options: { adGroupId },
+      onEvent: (event) => {
+        switch (event.type) {
+          case 'loaded':
+            cleanup();
+
+            GoogleAdMob.showAppsInTossAdMob({
+              options: { adGroupId },
+              onEvent: (showEvent) => {
+                switch (showEvent.type) {
+                  case 'show':
+                    adShown = true;
+                    if (adTimeoutRef.current) {
+                      clearTimeout(adTimeoutRef.current);
+                      adTimeoutRef.current = null;
+                    }
+                    break;
+                  case 'dismissed':
+                    setAdDismissed(true);
+                    break;
+                  case 'failedToShow':
+                    setAdDismissed(true);
+                    break;
+                }
+              },
+              onError: (error) => {
+                captureError(error, {
+                  location: 'showAd',
+                  tags: { feature: 'ad' },
+                });
+                setAdDismissed(true);
+              },
+            });
+            break;
+        }
+      },
+      onError: (error) => {
+        captureError(error, {
+          location: 'loadAd',
+          tags: { feature: 'ad' },
+        });
+        cleanup?.();
+        setAdDismissed(true);
+      },
+    });
+  }, []);
+
+  useEffect(() => {
+    mutate();
+    loadAndShowAd();
+
+    return () => {
+      if (adTimeoutRef.current) {
+        clearTimeout(adTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (adDismissed && analysisDone) {
+      resetForm();
+      navigation.replace('/result');
+    }
+  }, [adDismissed, analysisDone, navigation]);
 
   const openConfirmDialog = useCallback(() => {
     return new Promise<boolean>((resolve) => {
@@ -150,7 +198,6 @@ function Page() {
               type="danger"
               pointerEvents="auto"
               onPress={() => {
-                cancelledRef.current = true;
                 navigation.pop();
                 resolve(true);
                 close();
@@ -173,26 +220,6 @@ function Page() {
     backEvent.addEventListener(openConfirmDialog);
     return () => backEvent.removeEventListener(openConfirmDialog);
   }, [backEvent, openConfirmDialog]);
-
-  useEffect(() => {
-    clearResult();
-
-    if (startedRef.current) return;
-    startedRef.current = true;
-
-    mutate();
-    runAdPipeline();
-
-    return () => {
-      cancelledRef.current = true;
-      ad.actions.cleanup();
-      resetForm();
-    };
-  }, [mutate, runAdPipeline, resetForm, ad.actions]);
-
-  useEffect(() => {
-    tryMove();
-  }, [tryMove]);
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

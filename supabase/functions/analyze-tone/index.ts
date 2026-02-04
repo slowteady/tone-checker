@@ -180,6 +180,7 @@ Deno.serve(async (req) => {
       remaining_free: row.remaining_free,
       remaining_rewarded: row.remaining_rewarded,
       remaining_total: row.remaining_total,
+      rewarded_limit: row.rewarded_limit,
       used_from: row.used_from,
     },
   });

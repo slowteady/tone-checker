@@ -9,19 +9,23 @@ import {
   Toast,
   Txt,
 } from '@toss/tds-react-native';
-import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Keyboard, StyleSheet, View } from 'react-native';
 import { colors } from '@toss/tds-colors';
 import { RELATIONSHIP_OPTIONS, SITUATION_OPTIONS, type Relationship, type Situation } from 'constants/params';
-import { getDeviceId } from '@apps-in-toss/framework';
+import { getDeviceId, GoogleAdMob, useOverlay } from '@apps-in-toss/framework';
 import { useFormStore } from 'stores/form';
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useRemainingUsage } from 'hooks/useRemainingUsage';
 import { UsageLimitNotice } from 'components/UsageLimitNotice';
 import { ErrorResult } from 'components/ErrorResult';
 import { AnalysisBottomSheet } from 'components/AnalysisBottomSheet';
 import { useDeviceIdStore } from 'stores/device';
 import { AdBottomSheet } from 'components/AdBottomSheet';
+import { rewardOnce } from 'api/usage';
+import { ENDPOINT } from 'constants/endpoint';
+import { captureError } from 'lib/sentry';
+import { UsageInfoDto } from 'lib/schema';
 
 export const Route = createRoute('/', {
   component: Page,
@@ -54,8 +58,11 @@ function Page() {
 
 function Home({ deviceId }: { deviceId: string }) {
   const [toast, setToast] = useState({ open: false, message: '' });
-  const [adBottomSheetOpen, setAdBottomSheetOpen] = useState(false);
   const [analysisBottomSheetOpen, setAnalysisBottomSheetOpen] = useState(false);
+  const [isLoadingRewardAd, setIsLoadingRewardAd] = useState(false);
+
+  const adTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const rewardAdGroupId = __DEV__ ? import.meta.env.REWARD_AD_DEV_ID : import.meta.env.REWARD_AD_ID;
 
   const setDeviceId = useDeviceIdStore((s) => s.setDeviceId);
 
@@ -69,14 +76,186 @@ function Home({ deviceId }: { deviceId: string }) {
 
   const qc = useQueryClient();
   const navigation = useNavigation();
+  const overlay = useOverlay();
 
   const { data } = useSuspenseQuery({ ...useRemainingUsage(deviceId) });
 
   const remainingTotal = data.remaining_total;
   const hasLimit = data.has_limit;
   const rewardChargeRemaining = data.reward_charge_remaining;
-
   const isChargeable = remainingTotal === 0 && rewardChargeRemaining > 0;
+
+  const { mutateAsync: chargeReward } = useMutation({
+    mutationFn: () => rewardOnce(deviceId),
+    onMutate: async () => {
+      // Optimistic update
+      const queryKey = [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId];
+      await qc.cancelQueries({ queryKey });
+      const previous = qc.getQueryData(queryKey);
+
+      qc.setQueryData<UsageInfoDto>(queryKey, (prev) => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          remaining_rewarded: Math.min(prev.remaining_rewarded + 1, prev.rewarded_limit),
+          remaining_total: prev.remaining_total + 1,
+          reward_charge_remaining: Math.max(prev.reward_charge_remaining - 1, 0),
+        };
+      });
+
+      return { previous };
+    },
+    onSuccess: (data) => {
+      qc.setQueryData<UsageInfoDto>([ENDPOINT.RPC_GET_TODAY_STATUS, deviceId], (prev) => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          reward_charge_remaining: data.reward_charge_remaining,
+        };
+      });
+
+      setToast({ open: true, message: '분석 횟수 1회가 충전되었어요!' });
+    },
+    onError: (error, _vars, context) => {
+      if (context?.previous) {
+        qc.setQueryData([ENDPOINT.RPC_GET_TODAY_STATUS, deviceId], context.previous);
+      }
+
+      captureError(error, {
+        location: 'Home/chargeReward',
+        tags: { feature: 'usage' },
+      });
+
+      if (error instanceof Error && error.message === 'REWARD_LIMIT_EXCEEDED') {
+        setToast({ open: true, message: '오늘 충전 가능 횟수를 모두 사용했어요.' });
+      } else {
+        setToast({ open: true, message: '충전에 실패했어요. 다시 시도해주세요.' });
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] });
+    },
+  });
+
+  const watchAd = useCallback(() => {
+    if (GoogleAdMob.loadAppsInTossAdMob.isSupported() !== true) {
+      setToast({ open: true, message: '광고를 불러올 수 없어요.' });
+      return;
+    }
+
+    setIsLoadingRewardAd(true);
+
+    let adShown = false;
+    let rewardEarned = false;
+
+    adTimeoutRef.current = setTimeout(() => {
+      if (!adShown) {
+        setIsLoadingRewardAd(false);
+        setToast({ open: true, message: '광고를 불러오지 못했어요. 잠시 후 다시 시도해주세요.' });
+      }
+    }, 8000);
+
+    const cleanup = GoogleAdMob.loadAppsInTossAdMob({
+      options: { adGroupId: rewardAdGroupId },
+      onEvent: (event) => {
+        switch (event.type) {
+          case 'loaded':
+            cleanup();
+
+            GoogleAdMob.showAppsInTossAdMob({
+              options: { adGroupId: rewardAdGroupId },
+              onEvent: async (showEvent) => {
+                switch (showEvent.type) {
+                  case 'show':
+                    adShown = true;
+                    if (adTimeoutRef.current) {
+                      clearTimeout(adTimeoutRef.current);
+                      adTimeoutRef.current = null;
+                    }
+                    break;
+                  case 'userEarnedReward':
+                    rewardEarned = true;
+                    break;
+                  case 'dismissed':
+                    if (rewardEarned) {
+                      try {
+                        await chargeReward();
+                      } finally {
+                        setIsLoadingRewardAd(false);
+                      }
+                    } else {
+                      setIsLoadingRewardAd(false);
+                      setToast({ open: true, message: '광고를 끝까지 시청해야 충전돼요.' });
+                    }
+                    break;
+                  case 'failedToShow':
+                    setIsLoadingRewardAd(false);
+                    setToast({ open: true, message: '광고를 불러오지 못했어요.' });
+                    break;
+                }
+              },
+              onError: (error) => {
+                captureError(error, {
+                  location: 'api/rewardOnce/catch',
+                  tags: { feature: 'usage' },
+                });
+                setIsLoadingRewardAd(false);
+                setToast({ open: true, message: '광고를 불러오지 못했어요.' });
+              },
+            });
+            break;
+        }
+      },
+      onError: () => {
+        cleanup?.();
+        setIsLoadingRewardAd(false);
+        setToast({ open: true, message: '광고를 불러오지 못했어요. 잠시 후 다시 시도해주세요.' });
+        if (adTimeoutRef.current) {
+          clearTimeout(adTimeoutRef.current);
+          adTimeoutRef.current = null;
+        }
+      },
+    });
+  }, [rewardAdGroupId, chargeReward]);
+
+  const openAdBottomSheet = useCallback(() => {
+    return new Promise<void>((resolve) => {
+      overlay.open(({ isOpen, close, exit }) => {
+        const handleClose = () => {
+          if (isLoadingRewardAd) return;
+          close();
+          resolve();
+        };
+
+        const handleWatchAd = () => {
+          watchAd();
+          close();
+          resolve();
+        };
+
+        return (
+          <AdBottomSheet
+            open={isOpen}
+            rewardChargeRemaining={rewardChargeRemaining}
+            onClose={handleClose}
+            onWatchAd={handleWatchAd}
+            onExited={exit}
+            isLoading={isLoadingRewardAd}
+          />
+        );
+      });
+    });
+  }, [overlay, rewardChargeRemaining, watchAd, isLoadingRewardAd]);
+
+  useEffect(() => {
+    return () => {
+      if (adTimeoutRef.current) {
+        clearTimeout(adTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const executeAnalyze = useCallback(async () => {
     setAnalysisBottomSheetOpen(false);
@@ -87,21 +266,12 @@ function Home({ deviceId }: { deviceId: string }) {
     const isTextTooShort = text.length < 20;
     Keyboard.dismiss();
 
-    if (isChargeable) {
-      setAdBottomSheetOpen(true);
-      return;
-    }
     if (isTextTooShort) {
       setToast({ open: true, message: '최소 20자 이상 입력해주세요.' });
       return;
     }
     setAnalysisBottomSheetOpen(true);
-  }, [text, isChargeable]);
-
-  const failedToShowAd = useCallback(() => {
-    setAdBottomSheetOpen(false);
-    setToast({ open: true, message: '광고 로드에 실패했습니다. 다시 시도해주세요.' });
-  }, []);
+  }, [text, isChargeable, openAdBottomSheet]);
 
   useEffect(() => {
     setDeviceId(deviceId);
@@ -132,7 +302,7 @@ function Home({ deviceId }: { deviceId: string }) {
 
           {isChargeable && (
             <View style={{ marginBottom: 24 }}>
-              <UsageLimitNotice onWatchAd={() => setAdBottomSheetOpen(true)} />
+              <UsageLimitNotice onWatchAd={openAdBottomSheet} />
             </View>
           )}
 
@@ -221,13 +391,6 @@ function Home({ deviceId }: { deviceId: string }) {
         />
       )}
 
-      <AdBottomSheet
-        deviceId={deviceId}
-        rewardChargeRemaining={rewardChargeRemaining}
-        open={adBottomSheetOpen}
-        onClose={() => setAdBottomSheetOpen(false)}
-        onFailedToShow={failedToShowAd}
-      />
       <AnalysisBottomSheet
         open={analysisBottomSheetOpen}
         onClose={() => setAnalysisBottomSheetOpen(false)}

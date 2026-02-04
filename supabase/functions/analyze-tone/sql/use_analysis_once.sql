@@ -4,7 +4,7 @@ CREATE OR REPLACE FUNCTION public.use_analysis_once(p_device_id text)
  SECURITY DEFINER
 AS $function$
 declare
-  v_today date := current_date;
+  v_today date := (now() at time zone 'Asia/Seoul')::date;
   v_row public.daily_usage%rowtype;
 begin
   -- 1) 오늘 row 잠금 확보 (있으면)
