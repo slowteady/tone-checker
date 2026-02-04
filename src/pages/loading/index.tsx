@@ -1,6 +1,6 @@
 import { createRoute, useNavigation } from '@granite-js/react-native';
 import { ConfirmDialog, Loader, Result } from '@toss/tds-react-native';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { useBackEvent } from '@granite-js/react-native';
 import { useOverlay } from '@apps-in-toss/framework';
@@ -11,12 +11,17 @@ import { useResultStore } from 'stores/result';
 import { ENDPOINT } from 'constants/endpoint';
 import { UsageInfoDto } from 'lib/schema';
 import { useDeviceIdStore } from 'stores/device';
+import { useAd } from 'hooks/useAd';
+import { withTimeout } from 'lib/withTimeout';
 
 export const Route = createRoute('/loading', {
   component: Page,
 });
 
 function Page() {
+  const [analysisDone, setAnalysisDone] = useState(false);
+  const [adDone, setAdDone] = useState(false);
+
   const cancelledRef = useRef(false);
   const startedRef = useRef(false);
 
@@ -35,6 +40,19 @@ function Page() {
   const navigation = useNavigation();
 
   const queryKey = [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId] as const;
+
+  const ad = useAd({
+    adGroupId: __DEV__ ? import.meta.env.DISPLAY_AD_DEV_ID : import.meta.env.DISPLAY_AD_ID,
+  });
+
+  const tryMove = useCallback(() => {
+    if (cancelledRef.current) return;
+    if (!analysisDone) return;
+    if (!adDone) return;
+
+    resetForm();
+    navigation.replace('/result');
+  }, [analysisDone, adDone, navigation, resetForm]);
 
   const { mutate } = useMutation({
     mutationFn: () =>
@@ -79,18 +97,32 @@ function Page() {
       if (cancelledRef.current) return;
 
       setAnalysisResult(data);
-      navigation.replace('/result');
+      setAnalysisDone(true);
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous) {
-        qc.setQueryData(queryKey, ctx.previous);
-      }
+      if (ctx?.previous) qc.setQueryData(queryKey, ctx.previous);
+
+      setAnalysisDone(true);
       throw new Error();
     },
     onSettled: async () => {
       await qc.invalidateQueries({ queryKey });
     },
   });
+
+  const runAdPipeline = useCallback(async () => {
+    await withTimeout(
+      (async () => {
+        const loadRes = await ad.actions.loadAd();
+        if (loadRes !== 'loaded') return;
+        await ad.actions.showAd();
+      })(),
+      5_000
+    );
+
+    ad.actions.cleanup();
+    setAdDone(true);
+  }, [ad.actions]);
 
   const openConfirmDialog = useCallback(() => {
     return new Promise<boolean>((resolve) => {
@@ -146,12 +178,18 @@ function Page() {
     startedRef.current = true;
 
     mutate();
+    runAdPipeline();
 
     return () => {
       cancelledRef.current = true;
+      ad.actions.cleanup();
       resetForm();
     };
-  }, [mutate, resetForm]);
+  }, [mutate, runAdPipeline, resetForm, ad.actions]);
+
+  useEffect(() => {
+    tryMove();
+  }, [tryMove]);
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

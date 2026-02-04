@@ -84,14 +84,8 @@ function Home({ deviceId }: { deviceId: string }) {
   const isChargeable = remainingTotal === 0 && rewardChargeRemaining > 0;
 
   const adGroupId = useMemo(() => {
-    return __DEV__
-      ? isChargeable
-        ? import.meta.env.REWARD_AD_DEV_ID
-        : import.meta.env.DISPLAY_AD_DEV_ID
-      : isChargeable
-        ? import.meta.env.REWARD_AD_ID
-        : import.meta.env.DISPLAY_AD_ID;
-  }, [isChargeable]);
+    return __DEV__ ? import.meta.env.REWARD_AD_DEV_ID : import.meta.env.REWARD_AD_ID;
+  }, []);
 
   const executeAnalyze = useCallback(async () => {
     setAnalysisBottomSheetOpen(false);
