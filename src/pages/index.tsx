@@ -139,86 +139,92 @@ function Home({ deviceId }: { deviceId: string }) {
     },
   });
 
-  const watchAd = useCallback(() => {
-    if (GoogleAdMob.loadAppsInTossAdMob.isSupported() !== true) {
-      setToast({ open: true, message: '광고를 불러올 수 없어요.' });
-      return;
-    }
-
-    setIsLoadingRewardAd(true);
-
-    let adShown = false;
-    let rewardEarned = false;
-
-    adTimeoutRef.current = setTimeout(() => {
-      if (!adShown) {
-        setIsLoadingRewardAd(false);
-        setToast({ open: true, message: '광고를 불러오지 못했어요. 잠시 후 다시 시도해주세요.' });
+  const watchAd = useCallback(
+    (onClose: () => void) => {
+      if (GoogleAdMob.loadAppsInTossAdMob.isSupported() !== true) {
+        setToast({ open: true, message: '광고를 불러올 수 없어요.' });
+        onClose();
+        return;
       }
-    }, 8000);
 
-    const cleanup = GoogleAdMob.loadAppsInTossAdMob({
-      options: { adGroupId: rewardAdGroupId },
-      onEvent: (event) => {
-        switch (event.type) {
-          case 'loaded':
-            cleanup();
+      setIsLoadingRewardAd(true);
 
-            GoogleAdMob.showAppsInTossAdMob({
-              options: { adGroupId: rewardAdGroupId },
-              onEvent: async (showEvent) => {
-                switch (showEvent.type) {
-                  case 'show':
-                    adShown = true;
-                    if (adTimeoutRef.current) {
-                      clearTimeout(adTimeoutRef.current);
-                      adTimeoutRef.current = null;
-                    }
-                    break;
-                  case 'userEarnedReward':
-                    rewardEarned = true;
-                    break;
-                  case 'dismissed':
-                    if (rewardEarned) {
-                      try {
-                        await chargeReward();
-                      } finally {
-                        setIsLoadingRewardAd(false);
+      let adShown = false;
+      let rewardEarned = false;
+
+      adTimeoutRef.current = setTimeout(() => {
+        if (!adShown) {
+          setIsLoadingRewardAd(false);
+          setToast({ open: true, message: '광고를 불러오지 못했어요. 잠시 후 다시 시도해주세요.' });
+        }
+      }, 8000);
+
+      const cleanup = GoogleAdMob.loadAppsInTossAdMob({
+        options: { adGroupId: rewardAdGroupId },
+        onEvent: (event) => {
+          switch (event.type) {
+            case 'loaded':
+              cleanup();
+
+              GoogleAdMob.showAppsInTossAdMob({
+                options: { adGroupId: rewardAdGroupId },
+                onEvent: async (showEvent) => {
+                  switch (showEvent.type) {
+                    case 'show':
+                      adShown = true;
+                      if (adTimeoutRef.current) {
+                        clearTimeout(adTimeoutRef.current);
+                        adTimeoutRef.current = null;
                       }
-                    } else {
+                      break;
+                    case 'userEarnedReward':
+                      rewardEarned = true;
+                      break;
+                    case 'dismissed':
+                      if (rewardEarned) {
+                        try {
+                          await chargeReward();
+                          onClose();
+                        } finally {
+                          setIsLoadingRewardAd(false);
+                        }
+                      } else {
+                        setIsLoadingRewardAd(false);
+                        setToast({ open: true, message: '광고를 끝까지 시청해야 충전돼요.' });
+                      }
+                      break;
+                    case 'failedToShow':
                       setIsLoadingRewardAd(false);
-                      setToast({ open: true, message: '광고를 끝까지 시청해야 충전돼요.' });
-                    }
-                    break;
-                  case 'failedToShow':
-                    setIsLoadingRewardAd(false);
-                    setToast({ open: true, message: '광고를 불러오지 못했어요.' });
-                    break;
-                }
-              },
-              onError: (error) => {
-                captureError(error, {
-                  location: 'api/rewardOnce/catch',
-                  tags: { feature: 'usage' },
-                });
-                setIsLoadingRewardAd(false);
-                setToast({ open: true, message: '광고를 불러오지 못했어요.' });
-              },
-            });
-            break;
-        }
-      },
-      onError: () => {
-        cleanup?.();
-        setIsLoadingRewardAd(false);
-        setToast({ open: true, message: '광고를 불러오지 못했어요. 잠시 후 다시 시도해주세요.' });
-        if (adTimeoutRef.current) {
-          clearTimeout(adTimeoutRef.current);
-          adTimeoutRef.current = null;
-        }
-      },
-    });
-  }, [rewardAdGroupId, chargeReward]);
+                      setToast({ open: true, message: '광고를 불러오지 못했어요.' });
+                      break;
+                  }
+                },
+                onError: (error) => {
+                  captureError(error, {
+                    location: 'api/rewardOnce/catch',
+                    tags: { feature: 'usage' },
+                  });
+                  setIsLoadingRewardAd(false);
+                  setToast({ open: true, message: '광고를 불러오지 못했어요.' });
+                  onClose();
+                },
+              });
+              break;
+          }
+        },
+        onError: () => {
+          cleanup?.();
+          setIsLoadingRewardAd(false);
+          setToast({ open: true, message: '광고를 불러오지 못했어요. 잠시 후 다시 시도해주세요.' });
+          if (adTimeoutRef.current) {
+            clearTimeout(adTimeoutRef.current);
+            adTimeoutRef.current = null;
+          }
+        },
+      });
+    },
+    [rewardAdGroupId, chargeReward]
+  );
 
   const openAdBottomSheet = useCallback(() => {
     return new Promise<void>((resolve) => {
@@ -229,11 +235,7 @@ function Home({ deviceId }: { deviceId: string }) {
           resolve();
         };
 
-        const handleWatchAd = () => {
-          watchAd();
-          close();
-          resolve();
-        };
+        const handleWatchAd = () => watchAd(handleClose);
 
         return (
           <AdBottomSheet
