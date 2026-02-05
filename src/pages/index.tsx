@@ -84,6 +84,7 @@ function Home({ deviceId }: { deviceId: string }) {
   const hasLimit = data.has_limit;
   const rewardChargeRemaining = data.reward_charge_remaining;
   const isChargeable = remainingTotal === 0 && rewardChargeRemaining > 0;
+  const isFinished = remainingTotal === 0 && rewardChargeRemaining === 0;
 
   const { mutateAsync: chargeReward } = useMutation({
     mutationFn: () => rewardOnce(deviceId),
@@ -371,6 +372,14 @@ function Home({ deviceId }: { deviceId: string }) {
             </View>
           )}
 
+          {isFinished && (
+            <View style={[styles.notice, { marginBottom: 24 }]}>
+              <Txt typography="st11" fontWeight="bold" color={colors.whiteOpacity800}>
+                {`오늘 분석 횟수를 모두 사용했어요`}
+              </Txt>
+            </View>
+          )}
+
           <Flex direction="column" style={{ marginBottom: 24 }}>
             <Txt typography="t6" fontWeight="bold" color={colors.grey500} style={{ marginBottom: 8 }}>
               누구에게 보내나요?
@@ -487,5 +496,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 6,
+  },
+  notice: {
+    backgroundColor: colors.greyOpacity900,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
 });
