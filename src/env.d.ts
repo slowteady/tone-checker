@@ -7,6 +7,7 @@ type Env = {
   DISPLAY_AD_DEV_ID: string;
   REWARD_AD_DEV_ID: string;
   SENTRY_DSN: string;
+  SENTRY_ENABLE_IN_DEV: string;
 };
 
 interface ImportMeta {

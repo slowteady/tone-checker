@@ -36,6 +36,7 @@ export default defineConfig({
       DISPLAY_AD_DEV_ID: process.env.DISPLAY_AD_DEV_ID,
       REWARD_AD_DEV_ID: process.env.REWARD_AD_DEV_ID,
       SENTRY_DSN: process.env.SENTRY_DSN,
+      SENTRY_ENABLE_IN_DEV: process.env.SENTRY_ENABLE_IN_DEV,
     }),
   ],
 });

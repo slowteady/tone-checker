@@ -26,6 +26,7 @@ import { rewardOnce } from 'api/usage';
 import { ENDPOINT } from 'constants/endpoint';
 import { captureError } from 'lib/sentry';
 import { UsageInfoDto } from 'lib/schema';
+import { createAdFlowLogger } from 'lib/adSentry';
 
 export const Route = createRoute('/', {
   component: Page,
@@ -59,7 +60,6 @@ function Page() {
 function Home({ deviceId }: { deviceId: string }) {
   const [toast, setToast] = useState({ open: false, message: '' });
   const [analysisBottomSheetOpen, setAnalysisBottomSheetOpen] = useState(false);
-  const [isLoadingRewardAd, setIsLoadingRewardAd] = useState(false);
 
   const adTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const rewardAdGroupId = __DEV__ ? import.meta.env.REWARD_AD_DEV_ID : import.meta.env.REWARD_AD_ID;
@@ -140,38 +140,84 @@ function Home({ deviceId }: { deviceId: string }) {
   });
 
   const watchAd = useCallback(
-    (onClose: () => void) => {
-      if (GoogleAdMob.loadAppsInTossAdMob.isSupported() !== true) {
-        setToast({ open: true, message: '광고를 불러올 수 없어요.' });
-        onClose();
-        return;
-      }
+    (opts: { onClose: () => void; setLoading: (v: boolean) => void }) => {
+      const { onClose, setLoading } = opts;
 
-      setIsLoadingRewardAd(true);
+      const log = createAdFlowLogger({
+        kind: 'rewarded',
+        screen: 'home',
+        placement: 'usage-charge',
+        deviceId,
+        adGroupId: rewardAdGroupId,
+        extraBase: { rewardChargeRemaining },
+      });
 
+      let finished = false;
+      let timedOut = false;
       let adShown = false;
       let rewardEarned = false;
 
-      adTimeoutRef.current = setTimeout(() => {
-        if (!adShown) {
-          setIsLoadingRewardAd(false);
-          setToast({ open: true, message: '광고를 불러오지 못했어요. 잠시 후 다시 시도해주세요.' });
+      const finalize = (opts?: { close?: boolean; reason?: string; extra?: Record<string, unknown> }) => {
+        if (finished) return;
+        finished = true;
+
+        if (adTimeoutRef.current) {
+          clearTimeout(adTimeoutRef.current);
+          adTimeoutRef.current = null;
         }
-      }, 8000);
+
+        setLoading(false);
+        if (opts?.reason) log.step(`finalize.${opts.reason}`, opts.extra);
+        if (opts?.close) onClose();
+      };
+
+      setLoading(true);
+      log.step('start');
+
+      if (GoogleAdMob.loadAppsInTossAdMob.isSupported() !== true) {
+        log.warn('not_supported');
+        setToast({ open: true, message: '광고를 불러올 수 없어요.' });
+        finalize({ close: true, reason: 'not_supported' });
+        return;
+      }
+
+      const TIMEOUT_MS = 8000;
+      adTimeoutRef.current = setTimeout(() => {
+        if (finished) return;
+        if (adShown) return;
+
+        timedOut = true;
+        log.warn('timeout', { timeoutMs: TIMEOUT_MS });
+
+        setToast({ open: true, message: '광고를 불러오지 못했어요. 잠시 후 다시 시도해주세요.' });
+        finalize({ close: true, reason: 'timeout' });
+      }, TIMEOUT_MS);
+
+      log.step('load.request');
 
       const cleanup = GoogleAdMob.loadAppsInTossAdMob({
         options: { adGroupId: rewardAdGroupId },
+
         onEvent: (event) => {
+          if (finished || timedOut) return;
+
           switch (event.type) {
-            case 'loaded':
-              cleanup();
+            case 'loaded': {
+              log.info('load.loaded');
+              cleanup?.();
+
+              log.step('show.request');
 
               GoogleAdMob.showAppsInTossAdMob({
                 options: { adGroupId: rewardAdGroupId },
                 onEvent: async (showEvent) => {
+                  if (finished || timedOut) return;
+                  log.step('show.event', { type: showEvent.type });
+
                   switch (showEvent.type) {
                     case 'show':
                       adShown = true;
+                      log.info('show.shown');
                       if (adTimeoutRef.current) {
                         clearTimeout(adTimeoutRef.current);
                         adTimeoutRef.current = null;
@@ -179,82 +225,99 @@ function Home({ deviceId }: { deviceId: string }) {
                       break;
                     case 'userEarnedReward':
                       rewardEarned = true;
+                      log.info('reward.earned');
                       break;
                     case 'dismissed':
+                      log.info('show.dismissed', { rewardEarned });
+
                       if (rewardEarned) {
                         try {
+                          log.step('reward.charge.request');
                           await chargeReward();
-                          onClose();
-                        } finally {
-                          setIsLoadingRewardAd(false);
+                          log.info('reward.charge.success');
+                          finalize({ close: true, reason: 'rewarded_and_charged' });
+                        } catch (e) {
+                          log.error(e, 'reward.charge.error');
+                          finalize({ close: true, reason: 'charge_failed' });
                         }
                       } else {
-                        setIsLoadingRewardAd(false);
                         setToast({ open: true, message: '광고를 끝까지 시청해야 충전돼요.' });
+                        finalize({ close: false, reason: 'dismissed_without_reward' });
                       }
                       break;
                     case 'failedToShow':
-                      setIsLoadingRewardAd(false);
+                      log.warn('show.failedToShow');
                       setToast({ open: true, message: '광고를 불러오지 못했어요.' });
+                      finalize({ close: true, reason: 'failed_to_show' });
                       break;
                   }
                 },
                 onError: (error) => {
-                  captureError(error, {
-                    location: 'api/rewardOnce/catch',
-                    tags: { feature: 'usage' },
-                  });
-                  setIsLoadingRewardAd(false);
+                  if (finished || timedOut) return;
+
+                  log.error(error, 'show.onError');
                   setToast({ open: true, message: '광고를 불러오지 못했어요.' });
-                  onClose();
+                  finalize({ close: true, reason: 'show_error' });
                 },
               });
+
+              break;
+            }
+            default:
+              log.step('load.event', { type: event.type });
               break;
           }
         },
-        onError: () => {
+        onError: (error) => {
+          if (finished) return;
+
+          log.error(error, 'load.onError');
           cleanup?.();
-          setIsLoadingRewardAd(false);
+
           setToast({ open: true, message: '광고를 불러오지 못했어요. 잠시 후 다시 시도해주세요.' });
-          if (adTimeoutRef.current) {
-            clearTimeout(adTimeoutRef.current);
-            adTimeoutRef.current = null;
-          }
+          finalize({ close: true, reason: 'load_error' });
         },
       });
     },
-    [rewardAdGroupId, chargeReward]
+    [deviceId, rewardAdGroupId, rewardChargeRemaining, chargeReward]
   );
 
   const openAdBottomSheet = useCallback(() => {
     return new Promise<void>((resolve) => {
       overlay.open(({ isOpen, close, exit }) => {
-        const handleClose = () => {
-          if (isLoadingRewardAd) return;
-          close();
-          resolve();
+        const Sheet = () => {
+          const [loading, setLoading] = useState(false);
+
+          const handleClose = () => {
+            if (loading) return;
+            close();
+            resolve();
+          };
+
+          const handleWatchAd = () => watchAd({ onClose: handleClose, setLoading });
+
+          return (
+            <AdBottomSheet
+              open={isOpen}
+              rewardChargeRemaining={rewardChargeRemaining}
+              onClose={handleClose}
+              onWatchAd={handleWatchAd}
+              onExited={exit}
+              isLoading={loading}
+            />
+          );
         };
 
-        const handleWatchAd = () => watchAd(handleClose);
-
-        return (
-          <AdBottomSheet
-            open={isOpen}
-            rewardChargeRemaining={rewardChargeRemaining}
-            onClose={handleClose}
-            onWatchAd={handleWatchAd}
-            onExited={exit}
-            isLoading={isLoadingRewardAd}
-          />
-        );
+        return <Sheet />;
       });
     });
-  }, [overlay, rewardChargeRemaining, watchAd, isLoadingRewardAd]);
+  }, [overlay, rewardChargeRemaining, watchAd]);
 
   useEffect(() => {
     return () => {
       if (adTimeoutRef.current) {
         clearTimeout(adTimeoutRef.current);
+        adTimeoutRef.current = null;
       }
     };
   }, []);

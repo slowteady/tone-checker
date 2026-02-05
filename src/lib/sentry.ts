@@ -1,5 +1,8 @@
 import * as Sentry from '@sentry/react-native';
 
+const ENABLE_IN_DEV = import.meta.env.SENTRY_ENABLE_IN_DEV === 'true';
+const SHOULD_SEND = !__DEV__ || ENABLE_IN_DEV;
+
 /**
  * 에러 심각도 레벨
  */
@@ -22,11 +25,9 @@ export interface ErrorContext {
  * Sentry에 에러를 캡쳐하고 로그를 남깁니다.
  */
 export function captureError(error: unknown, context?: ErrorContext, severity: ErrorSeverity = 'error'): void {
-  if (__DEV__) {
+  if (!SHOULD_SEND) {
     console.error(`[${severity.toUpperCase()}]`, context?.location || 'Unknown', error);
-    if (context?.extras) {
-      console.error('Context:', context.extras);
-    }
+    if (context?.extras) console.error('Context:', context.extras);
     return;
   }
 
@@ -63,8 +64,8 @@ export function captureError(error: unknown, context?: ErrorContext, severity: E
  * 메시지를 Sentry에 기록합니다.
  */
 export function captureMessage(message: string, severity: ErrorSeverity = 'info', context?: ErrorContext): void {
-  if (__DEV__) {
-    console.log(`[${severity.toUpperCase()}]`, message);
+  if (!SHOULD_SEND) {
+    console.log(`[${severity.toUpperCase()}]`, message, context?.extras);
     return;
   }
 
@@ -98,7 +99,7 @@ export function addBreadcrumb(breadcrumb: {
   level?: ErrorSeverity;
   data?: Record<string, unknown>;
 }): void {
-  if (__DEV__) {
+  if (!SHOULD_SEND) {
     console.log('[BREADCRUMB]', breadcrumb.message, breadcrumb.data);
     return;
   }
@@ -115,7 +116,6 @@ export function addBreadcrumb(breadcrumb: {
  * 사용자 정보를 설정합니다.
  */
 export function setUser(user: { id?: string; deviceId?: string; [key: string]: unknown }): void {
-  if (__DEV__) return;
   Sentry.setUser(user);
 }
 
@@ -123,6 +123,5 @@ export function setUser(user: { id?: string; deviceId?: string; [key: string]: u
  * 사용자 정보를 초기화합니다.
  */
 export function clearUser(): void {
-  if (__DEV__) return;
   Sentry.setUser(null);
 }

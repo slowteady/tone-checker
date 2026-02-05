@@ -12,6 +12,7 @@ import { ENDPOINT } from 'constants/endpoint';
 import { UsageInfoDto } from 'lib/schema';
 import { useDeviceIdStore } from 'stores/device';
 import { captureError } from 'lib/sentry';
+import { createAdFlowLogger } from 'lib/adSentry';
 
 export const Route = createRoute('/loading', {
   component: Page,
@@ -96,7 +97,21 @@ function Page() {
   const loadAndShowAd = useCallback(() => {
     const adGroupId = __DEV__ ? import.meta.env.DISPLAY_AD_DEV_ID : import.meta.env.DISPLAY_AD_ID;
 
+    const log = createAdFlowLogger({
+      kind: 'interstitial',
+      screen: 'loading',
+      placement: 'analyze-loading',
+      deviceId,
+      adGroupId,
+      extraBase: {
+        platform: Platform.OS,
+      },
+    });
+
+    log.step('start');
+
     if (GoogleAdMob.loadAppsInTossAdMob.isSupported() !== true) {
+      log.warn('not_supported');
       setAdDismissed(true);
       return;
     }
@@ -104,15 +119,23 @@ function Page() {
     let adShown = false;
 
     adTimeoutRef.current = setTimeout(() => {
+      log.warn('timeout', { timeoutMs: AD_TIMEOUT_MS });
       if (!adShown) setAdDismissed(true);
     }, AD_TIMEOUT_MS);
+
+    log.step('load.request');
 
     const cleanup = GoogleAdMob.loadAppsInTossAdMob({
       options: { adGroupId },
       onEvent: (event) => {
+        log.step('load.event', { type: event.type });
+
         switch (event.type) {
           case 'loaded':
+            log.info('load.loaded');
             cleanup();
+
+            log.step('show.request');
 
             GoogleAdMob.showAppsInTossAdMob({
               options: { adGroupId },
@@ -120,24 +143,24 @@ function Page() {
                 switch (showEvent.type) {
                   case 'show':
                     adShown = true;
+                    log.info('show.shown');
                     if (adTimeoutRef.current) {
                       clearTimeout(adTimeoutRef.current);
                       adTimeoutRef.current = null;
                     }
                     break;
                   case 'dismissed':
+                    log.info('show.dismissed');
                     setAdDismissed(true);
                     break;
                   case 'failedToShow':
+                    log.warn('show.failedToShow');
                     setAdDismissed(true);
                     break;
                 }
               },
               onError: (error) => {
-                captureError(error, {
-                  location: 'showAd',
-                  tags: { feature: 'ad' },
-                });
+                log.error(error, 'show.onError');
                 setAdDismissed(true);
               },
             });
@@ -145,10 +168,7 @@ function Page() {
         }
       },
       onError: (error) => {
-        captureError(error, {
-          location: 'loadAd',
-          tags: { feature: 'ad' },
-        });
+        log.error(error, 'load.onError');
         cleanup?.();
         setAdDismissed(true);
       },
