@@ -38,7 +38,7 @@ export const AdBottomSheet = ({
             </Button>
           }
           rightButton={
-            <Button display="block" onPress={onWatchAd} disabled={isLoading}>
+            <Button display="block" onPress={onWatchAd} disabled={isLoading} loading={isLoading}>
               광고 시청하기
             </Button>
           }
