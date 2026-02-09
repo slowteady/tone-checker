@@ -7,7 +7,7 @@ import { sentry } from '@granite-js/plugin-sentry';
 dotenv.config();
 
 export default defineConfig({
-  scheme: 'tone-checker',
+  scheme: 'intoss',
   appName: 'tone-checker',
   plugins: [
     sentry({ useClient: false }),
