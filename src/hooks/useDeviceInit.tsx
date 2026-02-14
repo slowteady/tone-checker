@@ -2,7 +2,6 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from 'lib/supabase';
 import { getDeviceId } from '@apps-in-toss/framework';
-import { captureError } from 'lib/sentry';
 import { Platform } from 'react-native';
 
 export function useDeviceInit() {
@@ -26,20 +25,12 @@ export function useDeviceInit() {
           p_platform: platform,
         });
 
-        if (error) {
-          captureError(error, {
-            location: 'useDeviceInit',
-            tags: { feature: 'device-init' },
-            extras: { deviceId, platform },
-          });
-        } else {
+        if (!error) {
           initialized.current = true;
         }
       } catch (error) {
-        captureError(error, {
-          location: 'useDeviceInit/catch',
-          tags: { feature: 'device-init' },
-        });
+        // 디바이스 초기화 실패는 앱 작동에 영향 없으므로 에러 추적 제거
+        console.error('Device init failed:', error);
       }
     }
 

@@ -24,7 +24,6 @@ import { useDeviceIdStore } from 'stores/device';
 import { AdBottomSheet } from 'components/AdBottomSheet';
 import { rewardOnce } from 'api/usage';
 import { ENDPOINT } from 'constants/endpoint';
-import { captureError } from 'lib/sentry';
 import { UsageInfoDto } from 'lib/schema';
 import { createAdFlowLogger } from 'lib/adSentry';
 
@@ -124,11 +123,6 @@ function Home({ deviceId }: { deviceId: string }) {
         qc.setQueryData([ENDPOINT.RPC_GET_TODAY_STATUS, deviceId], context.previous);
       }
 
-      captureError(error, {
-        location: 'Home/chargeReward',
-        tags: { feature: 'usage' },
-      });
-
       if (error instanceof Error && error.message === 'REWARD_LIMIT_EXCEEDED') {
         setToast({ open: true, message: '오늘 충전 가능 횟수를 모두 사용했어요.' });
       } else {
@@ -168,7 +162,7 @@ function Home({ deviceId }: { deviceId: string }) {
         }
 
         setLoading(false);
-        if (opts?.reason) log.step(`finalize.${opts.reason}`, opts.extra);
+        if (opts?.reason) log.finish(opts.reason, opts.extra);
         if (opts?.close) onClose();
       };
 
@@ -176,8 +170,7 @@ function Home({ deviceId }: { deviceId: string }) {
       log.step('start');
 
       if (GoogleAdMob.loadAppsInTossAdMob.isSupported() !== true) {
-        log.warn('not_supported');
-        setToast({ open: true, message: '광고를 불러올 수 없어요.' });
+        setToast({ open: true, message: '이 환경에서는 광고를 지원하지 않아요.' });
         finalize({ close: true, reason: 'not_supported' });
         return;
       }
@@ -188,9 +181,7 @@ function Home({ deviceId }: { deviceId: string }) {
         if (adShown) return;
 
         timedOut = true;
-        log.warn('timeout', { timeoutMs: TIMEOUT_MS });
-
-        setToast({ open: true, message: '광고를 불러오지 못했어요. 잠시 후 다시 시도해주세요.' });
+        setToast({ open: true, message: '네트워크 연결을 확인해주세요.' });
         finalize({ close: true, reason: 'timeout' });
       }, TIMEOUT_MS);
 
@@ -204,7 +195,7 @@ function Home({ deviceId }: { deviceId: string }) {
 
           switch (event.type) {
             case 'loaded': {
-              log.info('load.loaded');
+              log.step('load.loaded');
               cleanup?.();
 
               log.step('show.request');
@@ -218,7 +209,7 @@ function Home({ deviceId }: { deviceId: string }) {
                   switch (showEvent.type) {
                     case 'show':
                       adShown = true;
-                      log.info('show.shown');
+                      log.step('show.shown');
                       if (adTimeoutRef.current) {
                         clearTimeout(adTimeoutRef.current);
                         adTimeoutRef.current = null;
@@ -226,16 +217,16 @@ function Home({ deviceId }: { deviceId: string }) {
                       break;
                     case 'userEarnedReward':
                       rewardEarned = true;
-                      log.info('reward.earned');
+                      log.step('reward.earned');
                       break;
                     case 'dismissed':
-                      log.info('show.dismissed', { rewardEarned });
+                      log.step('show.dismissed', { rewardEarned });
 
                       if (rewardEarned) {
                         try {
                           log.step('reward.charge.request');
                           await chargeReward();
-                          log.info('reward.charge.success');
+                          log.step('reward.charge.success');
                           finalize({ close: true, reason: 'rewarded_and_charged' });
                         } catch (e) {
                           log.error(e, 'reward.charge.error');
@@ -247,8 +238,7 @@ function Home({ deviceId }: { deviceId: string }) {
                       }
                       break;
                     case 'failedToShow':
-                      log.warn('show.failedToShow');
-                      setToast({ open: true, message: '광고를 불러오지 못했어요.' });
+                      setToast({ open: true, message: '잠시 후 다시 시도해주세요.' });
                       finalize({ close: true, reason: 'failed_to_show' });
                       break;
                   }
@@ -257,7 +247,7 @@ function Home({ deviceId }: { deviceId: string }) {
                   if (finished || timedOut) return;
 
                   log.error(error, 'show.onError');
-                  setToast({ open: true, message: '광고를 불러오지 못했어요.' });
+                  setToast({ open: true, message: '잠시 후 다시 시도해주세요.' });
                   finalize({ close: true, reason: 'show_error' });
                 },
               });
@@ -275,7 +265,7 @@ function Home({ deviceId }: { deviceId: string }) {
           log.error(error, 'load.onError');
           cleanup?.();
 
-          setToast({ open: true, message: '광고를 불러오지 못했어요. 잠시 후 다시 시도해주세요.' });
+          setToast({ open: true, message: '네트워크 연결을 확인해주세요.' });
           finalize({ close: true, reason: 'load_error' });
         },
       });

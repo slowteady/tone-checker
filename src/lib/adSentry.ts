@@ -5,8 +5,8 @@ type AdKind = 'interstitial' | 'rewarded';
 
 type AdFlowLoggerParams = {
   kind: AdKind;
-  screen: string; // 예: "loading", "home"
-  placement: string; // 예: "analyze-loading", "usage-charge"
+  screen: string;
+  placement: string;
   deviceId?: string;
   adGroupId?: string;
   extraBase?: Record<string, unknown>;
@@ -38,24 +38,6 @@ export function createAdFlowLogger(params: AdFlowLoggerParams) {
     });
   };
 
-  const info = (message: string, data?: Record<string, unknown>) => {
-    captureMessage(message, 'info', {
-      location: `ad/${params.screen}/${params.placement}`,
-      tags: baseTags,
-      extras: { ...baseExtras, ...data },
-      user: params.deviceId ? { deviceId: params.deviceId } : undefined,
-    });
-  };
-
-  const warn = (message: string, data?: Record<string, unknown>) => {
-    captureMessage(message, 'warning', {
-      location: `ad/${params.screen}/${params.placement}`,
-      tags: baseTags,
-      extras: { ...baseExtras, ...data },
-      user: params.deviceId ? { deviceId: params.deviceId } : undefined,
-    });
-  };
-
   const error = (err: unknown, where: string, data?: Record<string, unknown>) => {
     captureError(err, {
       location: `ad/${params.screen}/${params.placement}/${where}`,
@@ -65,5 +47,18 @@ export function createAdFlowLogger(params: AdFlowLoggerParams) {
     });
   };
 
-  return { flowId, step, info, warn, error };
+  const finish = (reason: string, data?: Record<string, unknown>) => {
+    step(`finish.${reason}`, data);
+
+    const level = reason === 'success' || reason === 'rewarded_and_charged' ? 'info' : 'warning';
+
+    captureMessage(`ad.flow.${reason}`, level, {
+      location: `ad/${params.screen}/${params.placement}`,
+      tags: { ...baseTags, flow_result: reason },
+      extras: { ...baseExtras, ...data },
+      user: params.deviceId ? { deviceId: params.deviceId } : undefined,
+    });
+  };
+
+  return { flowId, step, error, finish };
 }

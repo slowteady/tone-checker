@@ -11,14 +11,14 @@ import { useResultStore } from 'stores/result';
 import { ENDPOINT } from 'constants/endpoint';
 import { UsageInfoDto } from 'lib/schema';
 import { useDeviceIdStore } from 'stores/device';
-import { captureError } from 'lib/sentry';
 import { createAdFlowLogger } from 'lib/adSentry';
 
 export const Route = createRoute('/loading', {
   component: Page,
 });
 
-const AD_TIMEOUT_MS = 5_000;
+const AD_LOAD_TIMEOUT_MS = 8_000;
+const AD_SHOW_TIMEOUT_MS = 3_000;
 
 function Page() {
   const [analysisDone, setAnalysisDone] = useState(false);
@@ -86,7 +86,6 @@ function Page() {
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.previous) qc.setQueryData(queryKey, ctx.previous);
-      captureError(_err, { location: 'loading/mutate', tags: { feature: 'analyze' } });
       setAnalysisDone(true);
     },
     onSettled: async () => {
@@ -111,17 +110,20 @@ function Page() {
     log.step('start');
 
     if (GoogleAdMob.loadAppsInTossAdMob.isSupported() !== true) {
-      log.warn('not_supported');
+      log.finish('not_supported');
       setAdDismissed(true);
       return;
     }
 
     let adShown = false;
 
+    // Phase 1: Load 타임아웃 (8초)
     adTimeoutRef.current = setTimeout(() => {
-      log.warn('timeout', { timeoutMs: AD_TIMEOUT_MS });
-      if (!adShown) setAdDismissed(true);
-    }, AD_TIMEOUT_MS);
+      if (!adShown) {
+        log.finish('load_timeout', { timeoutMs: AD_LOAD_TIMEOUT_MS });
+        setAdDismissed(true);
+      }
+    }, AD_LOAD_TIMEOUT_MS);
 
     log.step('load.request');
 
@@ -132,10 +134,23 @@ function Page() {
 
         switch (event.type) {
           case 'loaded':
-            log.info('load.loaded');
-            cleanup();
+            // Phase 1 타임아웃 해제
+            if (adTimeoutRef.current) {
+              clearTimeout(adTimeoutRef.current);
+              adTimeoutRef.current = null;
+            }
 
+            log.step('load.loaded');
+            cleanup();
             log.step('show.request');
+
+            // Phase 2: Show 타임아웃 (3초)
+            adTimeoutRef.current = setTimeout(() => {
+              if (!adShown) {
+                log.finish('show_timeout', { timeoutMs: AD_SHOW_TIMEOUT_MS });
+                setAdDismissed(true);
+              }
+            }, AD_SHOW_TIMEOUT_MS);
 
             GoogleAdMob.showAppsInTossAdMob({
               options: { adGroupId },
@@ -143,18 +158,19 @@ function Page() {
                 switch (showEvent.type) {
                   case 'show':
                     adShown = true;
-                    log.info('show.shown');
+                    log.step('show.shown');
                     if (adTimeoutRef.current) {
                       clearTimeout(adTimeoutRef.current);
                       adTimeoutRef.current = null;
                     }
                     break;
                   case 'dismissed':
-                    log.info('show.dismissed');
+                    log.step('show.dismissed');
+                    log.finish('success');
                     setAdDismissed(true);
                     break;
                   case 'failedToShow':
-                    log.warn('show.failedToShow');
+                    log.finish('failed_to_show');
                     setAdDismissed(true);
                     break;
                 }
