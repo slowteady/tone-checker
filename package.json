@@ -6,6 +6,8 @@
     "build": "granite build",
     "build:dev": "granite build --dev",
     "test": "jest --passWithNoTests",
+    "test:edge": "deno test --allow-net --allow-env supabase/functions/analyze-tone/__tests__/integration.test.ts",
+    "test:edge:watch": "deno test --allow-net --allow-env --watch supabase/functions/analyze-tone/__tests__/integration.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "clean": "rm -rf .granite node_modules"
