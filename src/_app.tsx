@@ -6,7 +6,7 @@ import { TDSProvider } from '@toss/tds-react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Sentry from '@sentry/react-native';
-import { ErrorResult } from 'components/ErrorResult';
+import { ErrorResult } from 'components/common/ErrorResult';
 import { useDeviceInit } from 'hooks/useDeviceInit';
 
 Sentry.init({

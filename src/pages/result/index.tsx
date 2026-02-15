@@ -2,11 +2,11 @@ import { colors } from '@toss/tds-colors';
 import { createRoute, Flex, useNavigation } from '@granite-js/react-native';
 import { StyleSheet, View } from 'react-native';
 import { Border, BottomInfo, FixedBottomCTA, FixedBottomCTAProvider, Post, Txt } from '@toss/tds-react-native';
-import { Progressbar } from 'components/Progressbar';
-import { SignalCard } from 'components/SignalCard';
+import { Progressbar } from 'components/result/Progressbar';
+import { SignalCard } from 'components/result/SignalCard';
 import { categoryScoresDetailsMap, categoryScoresMap } from 'constants/categoryScoresMap';
 import { useCallback, useMemo } from 'react';
-import { ResultCard } from 'components/ResultCard';
+import { ResultCard } from 'components/result/ResultCard';
 import { useResultStore } from 'stores/result';
 
 export const Route = createRoute('/result', {

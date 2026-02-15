@@ -1,7 +1,7 @@
 import { createRoute, useNavigation } from '@granite-js/react-native';
 import { colors, FixedBottomCTA, FixedBottomCTAProvider, Txt } from '@toss/tds-react-native';
 import { StyleSheet, View } from 'react-native';
-import { CopyCard } from 'components/CopyCard';
+import { CopyCard } from 'components/result/CopyCard';
 import { useResultStore } from 'stores/result';
 
 export const Route = createRoute('/suggestion', {
