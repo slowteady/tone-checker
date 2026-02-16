@@ -16,7 +16,7 @@ export type Situation = (typeof SITUATION_OPTIONS)[number]['value'];
 export const SCENARIO_OPTIONS = [
   { value: 'to_child', label: '자녀' },
   { value: 'to_parent', label: '부모님' },
-  { value: 'boss', label: '상사' },
+  { value: 'boss', label: '직장 상사' },
   { value: 'colleague', label: '동료' },
   { value: 'client', label: '고객' },
   { value: 'friend', label: '친구' },
