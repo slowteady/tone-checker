@@ -7,8 +7,13 @@ const BASE_URL = 'http://localhost:54321/functions/v1/analyze-tone';
 export interface AnalyzeRequest {
   text: string;
   device_id: string;
-  relationship: 'business' | 'personal';
-  situation: 'neutral' | 'sensitive' | 'casual';
+  // v1 (optional for backward compatibility)
+  relationship?: 'business' | 'personal';
+  situation?: 'neutral' | 'sensitive' | 'casual';
+  // v2
+  mode?: 'generate' | 'correct';
+  scenario?: 'to_child' | 'to_parent' | 'boss' | 'colleague' | 'client' | 'friend' | 'partner';
+  tone?: 'soft' | 'firm' | 'formal' | 'casual';
   platform: string;
 }
 
@@ -17,7 +22,7 @@ export interface AnalyzeRequest {
  */
 export async function callAnalyzeAPI(body: Partial<AnalyzeRequest>) {
   const defaultBody: AnalyzeRequest = {
-    text: '내일 회의 참석 부탁드립니다',
+    text: '내일 회의 참석 부탁드립니다. 중요한 안건이 있습니다.',
     device_id: 'test-device-123',
     relationship: 'business',
     situation: 'neutral',
@@ -29,6 +34,7 @@ export async function callAnalyzeAPI(body: Partial<AnalyzeRequest>) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
     },
     body: JSON.stringify(defaultBody),
   });

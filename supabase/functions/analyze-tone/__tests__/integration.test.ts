@@ -15,7 +15,7 @@ import { callAnalyzeAPI, generateDeviceId } from './helpers.ts';
  */
 Deno.test('정상 케이스 - 비즈니스 관계, 중립 상황', async () => {
   const { status, data } = await callAnalyzeAPI({
-    text: '내일 회의 참석 부탁드립니다',
+    text: '내일 회의 참석 부탁드립니다. 중요한 안건이 있습니다.',
     device_id: generateDeviceId(),
     relationship: 'business',
     situation: 'neutral',
@@ -74,7 +74,7 @@ Deno.test('에러 케이스 - 20자 미만 텍스트', async () => {
 
   assertEquals(status, 400);
   assertEquals(data.ok, false);
-  assertEquals(data.code, 'TEXT_TOO_SHORT');
+  assertEquals(data.error.code, 'TEXT_TOO_SHORT');
 });
 
 Deno.test('에러 케이스 - 800자 초과 텍스트', async () => {
@@ -86,7 +86,7 @@ Deno.test('에러 케이스 - 800자 초과 텍스트', async () => {
 
   assertEquals(status, 400);
   assertEquals(data.ok, false);
-  assertEquals(data.code, 'TEXT_TOO_LONG');
+  assertEquals(data.error.code, 'TEXT_TOO_LONG');
 });
 
 Deno.test('에러 케이스 - 빈 텍스트', async () => {
@@ -97,30 +97,22 @@ Deno.test('에러 케이스 - 빈 텍스트', async () => {
 
   assertEquals(status, 400);
   assertEquals(data.ok, false);
-  assertEquals(data.code, 'INVALID_INPUT');
+  assertEquals(data.error.code, 'TEXT_TOO_SHORT');
 });
 
 Deno.test('에러 케이스 - device_id 누락', async () => {
-  const { status, data } = await callAnalyzeAPI({
-    text: '내일 회의 참석 부탁드립니다',
-    device_id: '',
-  });
-
-  assertEquals(status, 400);
-  assertEquals(data.ok, false);
-  assertEquals(data.code, 'INVALID_INPUT');
-});
-
-Deno.test('에러 케이스 - 잘못된 relationship', async () => {
   const response = await fetch('http://localhost:54321/functions/v1/analyze-tone', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
+    },
     body: JSON.stringify({
-      text: '내일 회의 참석 부탁드립니다',
-      device_id: generateDeviceId(),
-      relationship: 'invalid',
+      text: '내일 회의 참석 부탁드립니다. 중요한 안건이 있습니다.',
+      relationship: 'business',
       situation: 'neutral',
       platform: 'test',
+      // device_id 의도적으로 누락
     }),
   });
 
@@ -128,27 +120,7 @@ Deno.test('에러 케이스 - 잘못된 relationship', async () => {
 
   assertEquals(response.status, 400);
   assertEquals(data.ok, false);
-  assertEquals(data.code, 'INVALID_INPUT');
-});
-
-Deno.test('에러 케이스 - 잘못된 situation', async () => {
-  const response = await fetch('http://localhost:54321/functions/v1/analyze-tone', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text: '내일 회의 참석 부탁드립니다',
-      device_id: generateDeviceId(),
-      relationship: 'business',
-      situation: 'invalid',
-      platform: 'test',
-    }),
-  });
-
-  const data = await response.json();
-
-  assertEquals(response.status, 400);
-  assertEquals(data.ok, false);
-  assertEquals(data.code, 'INVALID_INPUT');
+  assertEquals(data.error.code, 'INVALID_INPUT');
 });
 
 /**
@@ -157,13 +129,109 @@ Deno.test('에러 케이스 - 잘못된 situation', async () => {
 Deno.test('에러 케이스 - GET 요청', async () => {
   const response = await fetch('http://localhost:54321/functions/v1/analyze-tone', {
     method: 'GET',
+    headers: {
+      'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
+    },
   });
 
   const data = await response.json();
 
   assertEquals(response.status, 405);
   assertEquals(data.ok, false);
-  assertEquals(data.code, 'METHOD_NOT_ALLOWED');
+  assertEquals(data.error.code, 'METHOD_NOT_ALLOWED');
+});
+
+/**
+ * v2 정상 동작 테스트
+ */
+Deno.test('v2 정상 케이스 - generate 모드', async () => {
+  const { status, data } = await callAnalyzeAPI({
+    mode: 'generate',
+    text: '내일 연차 사용하고 싶어요',
+    device_id: generateDeviceId(),
+    scenario: 'boss',
+    tone: 'soft',
+    platform: 'test',
+  });
+
+  assertEquals(status, 200);
+  assertEquals(data.ok, true);
+  assertExists(data.data);
+
+  // messages 필드 검증
+  assertEquals(Array.isArray(data.data.messages), true);
+  assertEquals(data.data.messages.length, 3);
+
+  // 각 메시지 구조 검증
+  const message = data.data.messages[0];
+  assertExists(message.label);
+  assertExists(message.text);
+  assertEquals(typeof message.label, 'string');
+  assertEquals(typeof message.text, 'string');
+});
+
+Deno.test('v2 정상 케이스 - correct 모드', async () => {
+  const { status, data } = await callAnalyzeAPI({
+    mode: 'correct',
+    text: '내일 좀 쉬고 싶은데요 괜찮을까요? 업무가 좀 밀려서요.',
+    device_id: generateDeviceId(),
+    scenario: 'boss',
+    tone: 'formal',
+    platform: 'test',
+  });
+
+  assertEquals(status, 200);
+  assertEquals(data.ok, true);
+  assertExists(data.data);
+
+  // diagnosis 필드 검증
+  assertEquals(typeof data.data.diagnosis, 'string');
+
+  // corrections 필드 검증
+  assertEquals(Array.isArray(data.data.corrections), true);
+  assertEquals(data.data.corrections.length, 3);
+
+  // 각 교정 문장 구조 검증
+  const correction = data.data.corrections[0];
+  assertExists(correction.label);
+  assertExists(correction.description);
+  assertExists(correction.text);
+  assertEquals(typeof correction.label, 'string');
+  assertEquals(typeof correction.description, 'string');
+  assertEquals(typeof correction.text, 'string');
+
+  // 상세 분석 필드 검증 (v1 구조 유지)
+  assertEquals(typeof data.data.overall_score, 'number');
+  assertEquals(typeof data.data.summary, 'string');
+  assertExists(data.data.category_scores);
+  assertEquals(Array.isArray(data.data.signals), true);
+});
+
+/**
+ * v2 파라미터 검증 테스트 (입력 validation만, OpenAI 호출 없음)
+ */
+Deno.test('v2 에러 케이스 - 잘못된 mode 값', async () => {
+  const response = await fetch('http://localhost:54321/functions/v1/analyze-tone', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
+    },
+    body: JSON.stringify({
+      mode: 'invalid_mode',
+      text: '내일 회의 참석 부탁드립니다. 중요한 안건이 있습니다.',
+      device_id: generateDeviceId(),
+      scenario: 'boss',
+      tone: 'formal',
+      platform: 'test',
+    }),
+  });
+
+  const data = await response.json();
+
+  assertEquals(response.status, 400);
+  assertEquals(data.ok, false);
+  assertEquals(data.error.code, 'INVALID_INPUT');
 });
 
 /**
@@ -171,7 +239,7 @@ Deno.test('에러 케이스 - GET 요청', async () => {
  */
 Deno.test('응답 스키마 - suggestions 구조 검증', async () => {
   const { status, data } = await callAnalyzeAPI({
-    text: '내일 회의 참석 부탁드립니다',
+    text: '내일 회의 참석 부탁드립니다. 중요한 안건이 있습니다.',
     device_id: generateDeviceId(),
   });
 
