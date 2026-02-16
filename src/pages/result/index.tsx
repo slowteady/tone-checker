@@ -5,10 +5,10 @@ import { Border, BottomInfo, FixedBottomCTA, FixedBottomCTAProvider, Post, Txt }
 import { Progressbar } from 'components/result/Progressbar';
 import { SignalCard } from 'components/result/SignalCard';
 import { categoryScoresDetailsMap, categoryScoresMap } from 'constants/categoryScoresMap';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { ResultCard } from 'components/result/ResultCard';
 import { useResultStore } from 'stores/result';
-import { isCorrectResponse, isAnalyzeResponse } from 'lib/schema';
+import { isCorrectResponse, type CategoryScoreItemDto, type SignalDto } from 'lib/schema';
 
 export const Route = createRoute('/result', {
   component: Page,
@@ -18,22 +18,20 @@ function Page() {
   const analysisResult = useResultStore((s) => s.analysisResult);
   const navigation = useNavigation();
 
-  // v1 또는 v2 correct 모드만 이 페이지에서 처리
-  if (!isAnalyzeResponse(analysisResult) && !isCorrectResponse(analysisResult)) {
+  // correct 모드만 이 페이지에서 처리
+  if (!isCorrectResponse(analysisResult)) {
     return null;
   }
-
-  const isCorrect = isCorrectResponse(analysisResult);
 
   const result = analysisResult.data;
   const categoryScores = result.category_scores;
   const categoryScoresArray = useMemo(
     () =>
-      Object.entries(categoryScores).map(([key, value]) => ({
+      Object.entries(categoryScores).map(([key, value]: [string, CategoryScoreItemDto]) => ({
         category: categoryScoresMap[key as keyof typeof categoryScoresMap],
         score: value.score,
         comment: value.comment,
-        detail: Object.entries(value.details).map(([key, value]) => ({
+        detail: Object.entries(value.details).map(([key, value]: [string, { score: number; comment: string }]) => ({
           category: categoryScoresDetailsMap[key as keyof typeof categoryScoresDetailsMap],
           score: value.score,
           comment: value.comment,
@@ -41,10 +39,6 @@ function Page() {
       })),
     [categoryScores]
   );
-
-  const navigateToSuggestion = useCallback(() => {
-    navigation.push('/suggestion');
-  }, [navigation]);
 
   const hasWarnings = result.warnings.length > 0;
   const hasSignals = result.signals.length > 0;
@@ -88,7 +82,7 @@ function Page() {
             }}
           >
             <Post.Ul typography="st11" paddingBottom={0} style={{ paddingLeft: 8 }}>
-              {result.warnings.map((warning, idx) => (
+              {result.warnings.map((warning: string, idx: number) => (
                 <Post.Li key={idx} color={colors.grey700}>
                   {warning}
                 </Post.Li>
@@ -99,7 +93,7 @@ function Page() {
 
         {hasSignals && (
           <Flex direction="column" style={{ marginBottom: 20, gap: 16 }}>
-            {result.signals.map((signal, idx) => {
+            {result.signals.map((signal: SignalDto, idx: number) => {
               const key = `${signal.category}-${idx}`;
               return <SignalCard key={key} level={signal.level} reason={signal.reason} evidence={signal.evidence} />;
             })}
@@ -132,20 +126,12 @@ function Page() {
         </Flex>
       </View>
 
-      {/* v2 correct: 홈으로, v1: suggestion으로 */}
-      {isCorrect ? (
-        <FixedBottomCTA onPress={() => navigation.popToTop()}>
-          <Txt typography="t6" fontWeight="bold" color={colors.white}>
-            홈으로 돌아가기
-          </Txt>
-        </FixedBottomCTA>
-      ) : (
-        <FixedBottomCTA onPress={navigateToSuggestion}>
-          <Txt typography="t6" fontWeight="bold" color={colors.white}>
-            개선된 문장 확인하기
-          </Txt>
-        </FixedBottomCTA>
-      )}
+      {/* v2 correct: 홈으로 */}
+      <FixedBottomCTA onPress={() => navigation.popToTop()}>
+        <Txt typography="t6" fontWeight="bold" color={colors.white}>
+          홈으로 돌아가기
+        </Txt>
+      </FixedBottomCTA>
     </FixedBottomCTAProvider>
   );
 }

@@ -207,15 +207,9 @@ function Page() {
   useEffect(() => {
     if (adDismissed && analysisDone) {
       resetForm();
-
-      // v2: generate/correct → suggestion, v1: result
-      if (mode === 'generate' || mode === 'correct') {
-        navigation.replace('/suggestion');
-      } else {
-        navigation.replace('/result');
-      }
+      navigation.replace('/suggestion');
     }
-  }, [adDismissed, analysisDone, navigation, mode]);
+  }, [adDismissed, analysisDone, navigation]);
 
   const openConfirmDialog = useCallback(() => {
     return new Promise<boolean>((resolve) => {

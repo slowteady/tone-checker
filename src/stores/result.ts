@@ -1,10 +1,10 @@
-import type { AnalyzeResponseDto, GenerateResponseDto, CorrectResponseDto } from 'lib/schema';
+import type { GenerateResponseDto, CorrectResponseDto } from 'lib/schema';
 import { create } from 'zustand';
 
 type ResultState = {
-  analysisResult: AnalyzeResponseDto | GenerateResponseDto | CorrectResponseDto | null;
+  analysisResult: GenerateResponseDto | CorrectResponseDto | null;
 
-  setAnalysisResult: (result: AnalyzeResponseDto | GenerateResponseDto | CorrectResponseDto | null) => void;
+  setAnalysisResult: (result: GenerateResponseDto | CorrectResponseDto | null) => void;
   clearResult: () => void;
 };
 

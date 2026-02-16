@@ -100,30 +100,6 @@ export const rewardResponseSchema = z.object({
 });
 export type RewardResponseDto = z.infer<typeof rewardResponseSchema>;
 
-export const analyzeRequestSchema = z.object({
-  /**
-   * 분석할 텍스트
-   */
-  text: z.string().min(20).max(500),
-  /**
-   * 기기 ID
-   */
-  device_id: z.string(),
-  /**
-   * 관계
-   */
-  relationship: z.enum(['business', 'personal']),
-  /**
-   * 상황
-   */
-  situation: z.enum(['neutral', 'sensitive', 'casual']),
-  /**
-   * 플랫폼
-   */
-  platform: z.string(),
-});
-export type AnalyzeRequestDto = z.infer<typeof analyzeRequestSchema>;
-
 export const analyzeRequestV2Schema = z.object({
   /**
    * 모드 (생성/교정)
@@ -257,32 +233,11 @@ export const correctResponseSchema = z.object({
 });
 export type CorrectResponseDto = z.infer<typeof correctResponseSchema>;
 
-export const analyzeResponseSchema = z.object({
-  ok: z.boolean(),
-  data: z.object({
-    overall_score: z.number(),
-    summary: z.string(),
-    category_scores: categoryScoresSchema,
-    signals: z.array(signalSchema),
-    suggestions: z.array(suggestionSchema),
-    warnings: z.array(z.string()),
-    accuracy_warning: z.boolean(),
-    usage: usageResultSchema,
-  }),
-  error: z
-    .object({
-      code: z.string(),
-      message: z.string(),
-    })
-    .optional(),
-});
-export type AnalyzeResponseDto = z.infer<typeof analyzeResponseSchema>;
-
 /**
  * 타입 가드: v2 generate 모드 응답 확인
  */
 export function isGenerateResponse(
-  response: AnalyzeResponseDto | GenerateResponseDto | CorrectResponseDto | null
+  response: GenerateResponseDto | CorrectResponseDto | null
 ): response is GenerateResponseDto {
   return response !== null && 'data' in response && 'messages' in response.data;
 }
@@ -291,16 +246,7 @@ export function isGenerateResponse(
  * 타입 가드: v2 correct 모드 응답 확인
  */
 export function isCorrectResponse(
-  response: AnalyzeResponseDto | GenerateResponseDto | CorrectResponseDto | null
+  response: GenerateResponseDto | CorrectResponseDto | null
 ): response is CorrectResponseDto {
   return response !== null && 'data' in response && 'diagnosis' in response.data;
-}
-
-/**
- * 타입 가드: v1 응답 확인
- */
-export function isAnalyzeResponse(
-  response: AnalyzeResponseDto | GenerateResponseDto | CorrectResponseDto | null
-): response is AnalyzeResponseDto {
-  return response !== null && 'data' in response && 'suggestions' in response.data;
 }

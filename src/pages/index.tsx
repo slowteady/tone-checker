@@ -69,7 +69,6 @@ function Home({ deviceId }: { deviceId: string }) {
 
   const setDeviceId = useDeviceIdStore((s) => s.setDeviceId);
 
-  // v2 form store
   const mode = useFormStore((s) => s.mode);
   const scenario = useFormStore((s) => s.scenario);
   const tone = useFormStore((s) => s.tone);
@@ -444,8 +443,16 @@ function Home({ deviceId }: { deviceId: string }) {
                 {mode === 'generate' ? '상황을 자유롭게 설명해 주세요' : '교정할 문장을 입력해 주세요'}
               </Txt>
               {mode === 'generate' && (
-                <Pressable onPress={openExampleSheet}>
-                  <Txt typography="t7" fontWeight="bold" color={colors.blue600}>
+                <Pressable
+                  onPress={openExampleSheet}
+                  style={{
+                    backgroundColor: colors.grey100,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Txt typography="st11" fontWeight="semiBold" color={colors.grey600}>
                     예시 보기
                   </Txt>
                 </Pressable>

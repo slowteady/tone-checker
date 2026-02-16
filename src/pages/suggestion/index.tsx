@@ -3,7 +3,7 @@ import { colors, FixedBottomCTA, FixedBottomCTAProvider, Txt } from '@toss/tds-r
 import { StyleSheet, View } from 'react-native';
 import { CopyCard } from 'components/result/CopyCard';
 import { useResultStore } from 'stores/result';
-import { isGenerateResponse, isCorrectResponse, isAnalyzeResponse } from 'lib/schema';
+import { isGenerateResponse, isCorrectResponse } from 'lib/schema';
 
 export const Route = createRoute('/suggestion', {
   component: Page,
@@ -18,23 +18,19 @@ function Page() {
   // 응답 타입 체크
   const isCorrect = isCorrectResponse(analysisResult);
   const isGenerate = isGenerateResponse(analysisResult);
-  const isV1 = isAnalyzeResponse(analysisResult);
 
   // 응답 타입에 따라 데이터 추출
   let items: Array<{ label: string; description?: string; example: string }> = [];
 
-  if (isV1) {
-    // v1: suggestions
-    items = analysisResult.data.suggestions;
-  } else if (isCorrect) {
-    // v2 correct: corrections (text → example으로 매핑)
+  if (isCorrect) {
+    // correct 모드: corrections 데이터 매핑
     items = analysisResult.data.corrections.map((c) => ({
       label: c.label,
       description: c.description,
       example: c.text,
     }));
   } else if (isGenerate) {
-    // v2 generate: messages (description 없음)
+    // generate 모드: messages 데이터 매핑
     items = analysisResult.data.messages.map((m) => ({
       label: m.label,
       example: m.text,
@@ -46,7 +42,7 @@ function Page() {
   return (
     <FixedBottomCTAProvider>
       <View style={styles.container}>
-        {/* v2 correct: overall + diagnosis */}
+        {/* correct 모드: 종합 점수 표시 */}
         {isCorrect && (
           <View
             style={{
@@ -81,7 +77,7 @@ function Page() {
         ))}
       </View>
 
-      {/* v2 correct: 자세히 보기, 나머지: 홈으로 */}
+      {/* correct 모드: 자세히 보기, generate 모드: 홈으로 */}
       {isCorrect ? (
         <FixedBottomCTA onPress={() => navigation.push('/result')}>
           <Txt typography="t6" fontWeight="bold" color={colors.white}>
