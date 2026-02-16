@@ -8,17 +8,28 @@ import { categoryScoresDetailsMap, categoryScoresMap } from 'constants/categoryS
 import { useCallback, useMemo } from 'react';
 import { ResultCard } from 'components/result/ResultCard';
 import { useResultStore } from 'stores/result';
+import { isGenerateResponse, isCorrectResponse, isAnalyzeResponse } from 'lib/schema';
 
 export const Route = createRoute('/result', {
   component: Page,
 });
 
 function Page() {
-  const result = useResultStore((s) => s.analysisResult)?.data;
-  if (!result) return null;
-
+  const analysisResult = useResultStore((s) => s.analysisResult);
   const navigation = useNavigation();
 
+  // v2 generate 모드는 별도 페이지로 이동 (Phase 4에서 구현)
+  if (isGenerateResponse(analysisResult)) {
+    navigation.replace('/suggestion');
+    return null;
+  }
+
+  // v1 또는 v2 correct 모드만 이 페이지에서 처리
+  if (!isAnalyzeResponse(analysisResult) && !isCorrectResponse(analysisResult)) {
+    return null;
+  }
+
+  const result = analysisResult.data;
   const categoryScores = result.category_scores;
   const categoryScoresArray = useMemo(
     () =>

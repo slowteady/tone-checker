@@ -21,5 +21,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["supabase/**/*", "node_modules"]
 }

@@ -6,7 +6,7 @@ import { useClipboardCopy } from 'hooks/useClipboardCopy';
 
 export interface CopyCardProps {
   label: string;
-  description: string;
+  description?: string;
   example: string;
 }
 

@@ -124,6 +124,34 @@ export const analyzeRequestSchema = z.object({
 });
 export type AnalyzeRequestDto = z.infer<typeof analyzeRequestSchema>;
 
+export const analyzeRequestV2Schema = z.object({
+  /**
+   * 모드 (생성/교정)
+   */
+  mode: z.enum(['generate', 'correct']),
+  /**
+   * 분석할 텍스트
+   */
+  text: z.string().min(10).max(800),
+  /**
+   * 기기 ID
+   */
+  device_id: z.string(),
+  /**
+   * 시나리오 (관계)
+   */
+  scenario: z.enum(['to_child', 'to_parent', 'boss', 'colleague', 'client', 'friend', 'partner']),
+  /**
+   * 말투 (톤)
+   */
+  tone: z.enum(['soft', 'firm', 'formal', 'casual']),
+  /**
+   * 플랫폼
+   */
+  platform: z.string(),
+});
+export type AnalyzeRequestV2Dto = z.infer<typeof analyzeRequestV2Schema>;
+
 export const categoryScoreItemSchema = z.object({
   score: z.number(),
   comment: z.string(),
@@ -164,6 +192,27 @@ export const usageResultSchema = z.object({
 });
 export type UsageResultDto = z.infer<typeof usageResultSchema>;
 
+export const messageSchema = z.object({
+  label: z.string(),
+  text: z.string(),
+});
+export type MessageDto = z.infer<typeof messageSchema>;
+
+export const generateResponseSchema = z.object({
+  ok: z.boolean(),
+  data: z.object({
+    messages: z.array(messageSchema),
+    usage: usageResultSchema,
+  }),
+  error: z
+    .object({
+      code: z.string(),
+      message: z.string(),
+    })
+    .optional(),
+});
+export type GenerateResponseDto = z.infer<typeof generateResponseSchema>;
+
 export const suggestionSchema = z.object({
   label: z.string(),
   description: z.string(),
@@ -179,6 +228,34 @@ export const signalSchema = z.object({
   evidence: z.string(),
 });
 export type SignalDto = z.infer<typeof signalSchema>;
+
+export const correctionSchema = z.object({
+  label: z.string(),
+  description: z.string(),
+  text: z.string(),
+});
+export type CorrectionDto = z.infer<typeof correctionSchema>;
+
+export const correctResponseSchema = z.object({
+  ok: z.boolean(),
+  data: z.object({
+    diagnosis: z.string(),
+    corrections: z.array(correctionSchema),
+    overall_score: z.number(),
+    summary: z.string(),
+    category_scores: categoryScoresSchema,
+    signals: z.array(signalSchema),
+    warnings: z.array(z.string()),
+    usage: usageResultSchema,
+  }),
+  error: z
+    .object({
+      code: z.string(),
+      message: z.string(),
+    })
+    .optional(),
+});
+export type CorrectResponseDto = z.infer<typeof correctResponseSchema>;
 
 export const analyzeResponseSchema = z.object({
   ok: z.boolean(),
@@ -200,3 +277,30 @@ export const analyzeResponseSchema = z.object({
     .optional(),
 });
 export type AnalyzeResponseDto = z.infer<typeof analyzeResponseSchema>;
+
+/**
+ * 타입 가드: v2 generate 모드 응답 확인
+ */
+export function isGenerateResponse(
+  response: AnalyzeResponseDto | GenerateResponseDto | CorrectResponseDto | null
+): response is GenerateResponseDto {
+  return response !== null && 'data' in response && 'messages' in response.data;
+}
+
+/**
+ * 타입 가드: v2 correct 모드 응답 확인
+ */
+export function isCorrectResponse(
+  response: AnalyzeResponseDto | GenerateResponseDto | CorrectResponseDto | null
+): response is CorrectResponseDto {
+  return response !== null && 'data' in response && 'diagnosis' in response.data;
+}
+
+/**
+ * 타입 가드: v1 응답 확인
+ */
+export function isAnalyzeResponse(
+  response: AnalyzeResponseDto | GenerateResponseDto | CorrectResponseDto | null
+): response is AnalyzeResponseDto {
+  return response !== null && 'data' in response && 'suggestions' in response.data;
+}

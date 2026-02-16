@@ -93,7 +93,7 @@ Edge Function을 분리하지 않는 이유:
 
 ```
 시나리오: {scenarioLabel} ({scenario})
-톤: {toneLabel} ({tone})
+말투: {toneLabel} ({tone})
 상황: {text}
 ```
 
@@ -109,14 +109,14 @@ Edge Function을 분리하지 않는 이유:
 }
 ```
 
-- `label`: 톤 라벨 (예: "부드러운 표현", "격식 있는 표현", "친근한 표현") — 최대 20자
+- `label`: 말투 라벨 (예: "부드러운 표현", "격식 있는 표현", "친근한 표현") — 최대 20자
 - `text`: 생성된 메시지 본문 — 최대 1200자
 
 ### 라벨 생성 규칙
 
-AI가 선택한 톤을 기본으로 삼되 3개를 다르게 변형:
+AI가 선택한 말투를 기본으로 삼되 3개를 다르게 변형:
 
-| 사용자 선택 톤 | 카드 1 (기본) | 카드 2 (변형) | 카드 3 (변형) |
+| 사용자 선택 말투 | 카드 1 (기본) | 카드 2 (변형) | 카드 3 (변형) |
 |--------------|-------------|-------------|-------------|
 | 부드럽게 | "부드러운 표현" | "격식 있는 표현" | "친근한 표현" |
 | 단호하게 | "단호한 표현" | "부드럽지만 확실한 표현" | "간결한 표현" |
@@ -150,7 +150,7 @@ v1 시스템 프롬프트를 기반으로 확장:
 
 ```
 시나리오: {scenarioLabel} ({scenario})
-톤: {toneLabel} ({tone})
+말투: {toneLabel} ({tone})
 문장: {text}
 ```
 
@@ -160,9 +160,9 @@ v1 시스템 프롬프트를 기반으로 확장:
 {
   diagnosis: string,              // 한줄 진단 (최대 50자)
   corrections: [
-    { label: string, text: string },
-    { label: string, text: string },
-    { label: string, text: string },
+    { label: string, description: string, text: string },
+    { label: string, description: string, text: string },
+    { label: string, description: string, text: string },
   ],
   // 상세 분석 (v1 구조 그대로)
   overall_score: number,
@@ -185,7 +185,7 @@ v1 시스템 프롬프트를 기반으로 확장:
 | `warnings` | 경고 | 유지 |
 
 > v1의 `suggestions` → v2의 `corrections`로 이름 변경.
-> corrections는 label + text 구조 (v1의 label + description + example에서 description 제거).
+> corrections는 v1과 동일한 구조 유지: label + description + text (example → text로 이름만 변경).
 
 ## 6. Edge Function 변경 범위
 
@@ -232,15 +232,15 @@ lib/
 
 생성 모드는 점수 분석이 없어 출력이 짧으므로 토큰을 줄여 비용 절감.
 
-## 8. 시나리오/톤 라벨 매핑
+## 8. 시나리오/말투 라벨 매핑
 
 ```typescript
 const SCENARIO_LABEL: Record<Scenario, string> = {
-  to_child: '자녀에게',
-  to_parent: '부모에게',
-  boss: '직장상사',
+  to_child: '자녀',
+  to_parent: '부모님',
+  boss: '상사',
   colleague: '동료',
-  client: '거래처',
+  client: '고객',
   friend: '친구',
   partner: '연인',
 };
@@ -252,6 +252,20 @@ const TONE_LABEL: Record<Tone, string> = {
   casual: '캐주얼하게',
 };
 ```
+
+### 시나리오별 말투 가이드
+
+AI가 메시지 생성/교정 시 시나리오에 따라 적절한 말투를 자동 선택:
+
+| 시나리오 | 기본 말투 | 예시 |
+|----------|----------|------|
+| 친구(friend) | 반말 | ~해, ~야, ~어 |
+| 연인(partner) | 반말 | ~해, ~야, ~어 |
+| 자녀(to_child) | 반말/부드러운 존댓말 | ~해, ~하렴, ~하자 |
+| 부모님(to_parent) | 존댓말 필수 | ~요, ~니다 |
+| 상사(boss) | 존댓말 필수 | ~요, ~니다 |
+| 고객(client) | 존댓말 필수 | ~요, ~니다 |
+| 동료(colleague) | 존댓말 기본, 말투에 따라 반말 가능 | ~요, ~니다 (기본) |
 
 ## 9. 에러 코드 변경
 
