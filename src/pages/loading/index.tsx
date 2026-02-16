@@ -6,7 +6,7 @@ import { useBackEvent } from '@granite-js/react-native';
 import { GoogleAdMob, useOverlay } from '@apps-in-toss/framework';
 import { useFormStore } from 'stores/form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { analyzeTone } from 'api/analyze';
+import { analyzeToneV2 } from 'api/analyze';
 import { useResultStore } from 'stores/result';
 import { ENDPOINT } from 'constants/endpoint';
 import { UsageInfoDto } from 'lib/schema';
@@ -27,8 +27,9 @@ function Page() {
 
   const deviceId = useDeviceIdStore((s) => s.deviceId);
 
-  const relationship = useFormStore((s) => s.relationship);
-  const situation = useFormStore((s) => s.situation);
+  const mode = useFormStore((s) => s.mode);
+  const scenario = useFormStore((s) => s.scenario);
+  const tone = useFormStore((s) => s.tone);
   const text = useFormStore((s) => s.text);
   const resetForm = useFormStore((s) => s.reset);
 
@@ -43,11 +44,12 @@ function Page() {
 
   const { mutate } = useMutation({
     mutationFn: () =>
-      analyzeTone({
+      analyzeToneV2({
+        mode,
         device_id: deviceId,
         text,
-        relationship,
-        situation,
+        scenario: scenario!,
+        tone,
         platform: Platform.OS,
       }),
     onMutate: async () => {
