@@ -4,7 +4,8 @@ import { env } from '@granite-js/plugin-env';
 import * as dotenv from 'dotenv';
 import { sentry } from '@granite-js/plugin-sentry';
 
-dotenv.config();
+// DOTENV_CONFIG_PATH 환경 변수가 있으면 해당 파일 사용, 없으면 .env
+dotenv.config({ path: process.env.DOTENV_CONFIG_PATH || '.env' });
 
 export default defineConfig({
   scheme: 'intoss',

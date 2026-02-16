@@ -8,7 +8,7 @@ import { categoryScoresDetailsMap, categoryScoresMap } from 'constants/categoryS
 import { useCallback, useMemo } from 'react';
 import { ResultCard } from 'components/result/ResultCard';
 import { useResultStore } from 'stores/result';
-import { isGenerateResponse, isCorrectResponse, isAnalyzeResponse } from 'lib/schema';
+import { isCorrectResponse, isAnalyzeResponse } from 'lib/schema';
 
 export const Route = createRoute('/result', {
   component: Page,
@@ -18,16 +18,12 @@ function Page() {
   const analysisResult = useResultStore((s) => s.analysisResult);
   const navigation = useNavigation();
 
-  // v2 generate 모드는 별도 페이지로 이동 (Phase 4에서 구현)
-  if (isGenerateResponse(analysisResult)) {
-    navigation.replace('/suggestion');
-    return null;
-  }
-
   // v1 또는 v2 correct 모드만 이 페이지에서 처리
   if (!isAnalyzeResponse(analysisResult) && !isCorrectResponse(analysisResult)) {
     return null;
   }
+
+  const isCorrect = isCorrectResponse(analysisResult);
 
   const result = analysisResult.data;
   const categoryScores = result.category_scores;
@@ -136,11 +132,20 @@ function Page() {
         </Flex>
       </View>
 
-      <FixedBottomCTA onPress={navigateToSuggestion}>
-        <Txt typography="t6" fontWeight="bold" color={colors.white}>
-          개선된 문장 확인하기
-        </Txt>
-      </FixedBottomCTA>
+      {/* v2 correct: 홈으로, v1: suggestion으로 */}
+      {isCorrect ? (
+        <FixedBottomCTA onPress={() => navigation.popToTop()}>
+          <Txt typography="t6" fontWeight="bold" color={colors.white}>
+            홈으로 돌아가기
+          </Txt>
+        </FixedBottomCTA>
+      ) : (
+        <FixedBottomCTA onPress={navigateToSuggestion}>
+          <Txt typography="t6" fontWeight="bold" color={colors.white}>
+            개선된 문장 확인하기
+          </Txt>
+        </FixedBottomCTA>
+      )}
     </FixedBottomCTAProvider>
   );
 }

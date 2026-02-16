@@ -1,3 +1,10 @@
+---
+status: completed
+phase: 2
+completed_date: 2026-02-15
+summary: v2 백엔드 API와 연동하기 위한 프론트엔드 타입, 상수, 스토어, 스키마 변경 완료
+---
+
 # Phase 2: 프론트엔드 상태 & 상수 구현
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

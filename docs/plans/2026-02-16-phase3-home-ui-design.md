@@ -1,3 +1,10 @@
+---
+status: completed
+phase: 3
+completed_date: 2026-02-16
+summary: 홈 화면 v2 UI 설계 완료 - Tab 컴포넌트, SelectorField, ExampleBottomSheet 설계
+---
+
 # Phase 3: 홈 화면 v2 UI 구현 - 설계 문서
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:writing-plans to implement this plan task-by-task.

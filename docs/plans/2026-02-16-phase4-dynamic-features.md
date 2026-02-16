@@ -1,3 +1,11 @@
+---
+status: completed
+phase: 4
+completed_date: 2026-02-16
+summary: Task 1-3 스킵 결정 - 기존 UI/UX 충분, validation 이미 구현 완료
+next_steps: 테스트 진행 및 로직 정리
+---
+
 # Phase 4: 동적 기능 구현 계획
 
 ## 현재 상태 (2026-02-16)
@@ -21,6 +29,12 @@
 - result 페이지: correct 모드 지원
 - suggestion 페이지: generate/correct 둘 다 지원
 
+**Task 1-3 스킵 결정 (2026-02-16)**
+- 동적 플레이스홀더: 불필요 (기존 고정 문구로 충분)
+- 동적 힌트: 불필요
+- 최소 글자수 검증: 이미 수동 구현 완료
+- UI/UX가 충분히 직관적이므로 추가 동적 기능 구현하지 않음
+
 ### 🔍 현재 코드 상태
 
 **홈 화면 (`src/pages/index.tsx`)**
@@ -32,8 +46,9 @@
 - **이미 구현됨**: mode 변경 시 텍스트 초기화 (365줄)
 
 **결과 화면**
-- `/result`: correct 모드 전용 (분석 점수 + 교정 문장)
-- `/suggestion`: generate 모드 또는 교정 문장 표시
+- **generate 모드**: loading → `/suggestion` (생성된 메시지만)
+- **correct 모드**: loading → `/suggestion` (교정 문장 + overall 점수) → `/result` (상세 분석)
+- **v1**: loading → `/result` (분석 점수) → `/suggestion` (교정 문장)
 
 ---
 
@@ -51,7 +66,240 @@
 
 ---
 
-## Task 1: 동적 플레이스홀더 구현
+## Task 0: 플로우 수정 (긴급)
+
+### 배경
+
+Phase 3 구현 시 플로우가 잘못 구현되었습니다:
+
+**현재 (잘못됨):**
+- generate: loading → /result (리다이렉트) → /suggestion
+- correct: loading → /result (분석) → /suggestion (교정 문장)
+
+**올바른 플로우:**
+- generate: loading → /suggestion (메시지만)
+- correct: loading → /suggestion (교정 문장 + overall) → /result (디테일)
+- v1: loading → /result (분석) → /suggestion (교정 문장) [기존 유지]
+
+### 구현 방법
+
+**1. loading/index.tsx 수정 (210줄)**
+
+```tsx
+useEffect(() => {
+  if (adDismissed && analysisDone) {
+    resetForm();
+
+    // mode에 따라 분기
+    if (mode === 'generate' || mode === 'correct') {
+      navigation.replace('/suggestion');
+    } else {
+      navigation.replace('/result');  // v1
+    }
+  }
+}, [adDismissed, analysisDone, navigation, mode]);
+```
+
+**2. suggestion/index.tsx 수정**
+
+correct 모드일 때 overall_score + diagnosis 표시:
+
+```tsx
+// 파일 상단에 useNavigation 추가
+const navigation = useNavigation();
+
+// items 렌더링 전에 correct 모드 체크
+const isCorrect = isCorrectResponse(analysisResult);
+
+return (
+  <FixedBottomCTAProvider>
+    <View style={styles.container}>
+      {/* correct 모드: overall + diagnosis */}
+      {isCorrect && (
+        <View style={{ marginBottom: 16, padding: 16, backgroundColor: colors.grey50, borderRadius: 12 }}>
+          <Flex direction="row" justify="space-between" align="center">
+            <Txt typography="st6" fontWeight="semiBold" color={colors.grey700}>
+              종합 점수
+            </Txt>
+            <Txt typography="t4" fontWeight="bold" color={colors.grey900}>
+              {analysisResult.data.overall_score}점
+            </Txt>
+          </Flex>
+          <Txt typography="st11" color={colors.grey600} style={{ marginTop: 8 }}>
+            {analysisResult.data.diagnosis}
+          </Txt>
+        </View>
+      )}
+
+      <Txt typography="t3" fontWeight="bold" color={colors.grey900} style={{ marginBottom: 16 }}>
+        이런 표현은 어떠세요?
+      </Txt>
+
+      {items.map((item, index) => (
+        <View key={index} style={{ marginBottom: 16 }}>
+          <CopyCard label={item.label} description={item.description} example={item.example} />
+        </View>
+      ))}
+    </View>
+
+    {/* correct: 자세히 보기, 나머지: 홈으로 */}
+    {isCorrect ? (
+      <FixedBottomCTA onPress={() => navigation.push('/result')}>
+        <Txt typography="t6" fontWeight="bold" color={colors.white}>
+          분석 결과 자세히 보기
+        </Txt>
+      </FixedBottomCTA>
+    ) : (
+      <FixedBottomCTA onPress={() => navigation.popToTop()}>
+        <Txt typography="t6" fontWeight="bold" color={colors.white}>
+          홈으로 돌아가기
+        </Txt>
+      </FixedBottomCTA>
+    )}
+  </FixedBottomCTAProvider>
+);
+```
+
+**3. result/index.tsx 수정 (139-143줄)**
+
+v2 correct는 홈으로, v1은 suggestion으로:
+
+```tsx
+{isCorrectResponse(analysisResult) ? (
+  <FixedBottomCTA onPress={() => navigation.popToTop()}>
+    <Txt typography="t6" fontWeight="bold" color={colors.white}>
+      홈으로 돌아가기
+    </Txt>
+  </FixedBottomCTA>
+) : (
+  <FixedBottomCTA onPress={navigateToSuggestion}>
+    <Txt typography="t6" fontWeight="bold" color={colors.white}>
+      개선된 문장 확인하기
+    </Txt>
+  </FixedBottomCTA>
+)}
+```
+
+**4. 검증**
+
+```bash
+npm run typecheck
+```
+
+- [x] generate: loading → suggestion
+- [x] correct: loading → suggestion (overall + diagnosis 표시) → result
+- [x] v1: loading → result → suggestion
+- [x] result 페이지 버튼 분기 확인
+
+### ✅ Task 0 완료 (2026-02-16 세션 2)
+
+**구현 완료:**
+1. loading/index.tsx - mode에 따라 분기 완료
+2. suggestion/index.tsx - correct 모드에서 overall_score + diagnosis 표시 완료
+3. result/index.tsx - 버튼 분기 완료
+4. AnalysisBottomSheet.tsx - mode prop 추가, "생성"/"교정" 텍스트 동적화
+5. loading/index.tsx - "AI가 열심히 생성중/교정중" 텍스트 동적화
+6. 타입 체크 통과
+
+---
+
+## 로컬 Supabase 설정 (2026-02-16 세션 2)
+
+### 배경
+
+프로덕션 Supabase에는 v1 Edge Function이 배포되어 있어, v2 테스트를 위해 로컬 환경이 필요합니다.
+
+### 설정 완료
+
+**1. 환경 변수 설정**
+
+파일: `package.json`
+```json
+"dev:local": "DOTENV_CONFIG_PATH=.env.local granite dev"
+```
+
+파일: `granite.config.ts`
+```ts
+dotenv.config({ path: process.env.DOTENV_CONFIG_PATH || '.env' });
+```
+
+파일: `.env.local`
+```
+SUPABASE_URL=http://172.30.1.78:54321
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
+```
+
+**2. 로컬 Supabase 시작**
+
+```bash
+supabase status  # 실행 중 확인
+supabase db reset  # 마이그레이션 적용
+```
+
+**3. Edge Function 시작**
+
+```bash
+OPENAI_API_KEY="your-key" supabase functions serve analyze-tone --no-verify-jwt
+```
+
+### ⚠️ 현재 문제
+
+Edge Function이 500 에러를 반환하고 있습니다:
+```
+ERROR  [ERROR] api/analyzeToneV2 [FunctionsHttpError: Edge Function returned a non-2xx status code]
+```
+
+**확인 필요:**
+- [ ] OpenAI API 키가 제대로 전달되는지
+- [ ] Edge Function 로그 확인
+- [ ] SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY 환경 변수 확인
+
+**디버깅 명령:**
+```bash
+# Edge Function 로그 확인
+tail -f /tmp/supabase-functions-*.log
+
+# Edge Function 테스트
+curl -i http://172.30.1.78:54321/functions/v1/analyze-tone \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"correct","device_id":"test","text":"테스트","scenario":"boss","tone":"formal","platform":"ios"}'
+```
+
+### ✅ Edge Function 정상 작동 확인 (curl 테스트 성공)
+
+### 🔍 다음 세션 작업
+
+**우선순위 1: 횟수 차감 로직 테스트**
+- 문제: 횟수 차감이 제때 이루어지지 않는 것으로 보임
+- 확인 필요:
+  - [ ] 분석 실행 후 remaining_free 카운트 감소 확인
+  - [ ] 로딩 페이지에서 use_analysis_once RPC 호출 확인
+  - [ ] optimistic update 후 실제 서버 응답과 동기화 확인
+  - [ ] 에러 발생 시 횟수 차감 롤백 확인
+
+**우선순위 2: 전체 플로우 테스트**
+1. generate 모드: 메시지 생성 테스트
+2. correct 모드: 말투 교정 테스트 (overall + 자세히 보기)
+3. 플로우 정상 작동 확인
+
+**우선순위 3: Task 1-3 진행**
+- Task 1: 동적 플레이스홀더
+- Task 2: 동적 힌트
+- Task 3: 최소 글자수 검증 강화
+
+### ❌ Task 1-3 스킵 결정 (2026-02-16)
+
+**결정 사항:**
+- 동적 플레이스홀더: 불필요 (기존 고정 문구로 충분)
+- 동적 힌트: 불필요
+- 최소 글자수 검증: 이미 수동으로 구현 완료
+
+**이유:**
+현재 UI/UX가 충분히 직관적이며, 추가 동적 기능 없이도 사용자 가이드가 명확함. validation은 이미 구현되어 있음.
+
+---
+
+## ~~Task 1: 동적 플레이스홀더 구현~~ (스킵됨)
 
 ### 배경
 
@@ -136,7 +384,7 @@ npm run typecheck
 
 ---
 
-## Task 2: 동적 힌트 구현
+## ~~Task 2: 동적 힌트 구현~~ (스킵됨)
 
 ### 배경
 
@@ -242,7 +490,7 @@ const hint = useInputHint(mode, text.length);
 
 ---
 
-## Task 3: 최소 글자수 검증 강화
+## ~~Task 3: 최소 글자수 검증 강화~~ (스킵됨)
 
 ### 배경
 
@@ -296,10 +544,12 @@ const isValid = useMemo(() => {
 5. 교정할 문장 입력 (20자 이상)
 6. "교정하기" 버튼 클릭
 7. loading 화면 → 광고 표시
-8. result 화면으로 이동
-9. 분석 점수 확인
-10. suggestion 화면으로 이동
-11. 교정된 문장 3개 확인
+8. suggestion 화면으로 이동
+9. overall 점수 + diagnosis 확인
+10. 교정된 문장 3개 확인
+11. "분석 결과 자세히 보기" 버튼 클릭
+12. result 화면으로 이동
+13. 상세 분석 점수 5개 카테고리 확인
 
 **검증 항목**
 - [ ] 동적 플레이스홀더 업데이트

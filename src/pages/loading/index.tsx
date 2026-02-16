@@ -207,9 +207,15 @@ function Page() {
   useEffect(() => {
     if (adDismissed && analysisDone) {
       resetForm();
-      navigation.replace('/result');
+
+      // v2: generate/correct → suggestion, v1: result
+      if (mode === 'generate' || mode === 'correct') {
+        navigation.replace('/suggestion');
+      } else {
+        navigation.replace('/result');
+      }
     }
-  }, [adDismissed, analysisDone, navigation]);
+  }, [adDismissed, analysisDone, navigation, mode]);
 
   const openConfirmDialog = useCallback(() => {
     return new Promise<boolean>((resolve) => {
@@ -259,12 +265,14 @@ function Page() {
     return () => backEvent.removeEventListener(openConfirmDialog);
   }, [backEvent, openConfirmDialog]);
 
+  const actionLabel = mode === 'generate' ? '생성' : '교정';
+
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
       <Result
         figure={<Loader size="large" style={{ marginBottom: 16 }} />}
-        title="AI가 열심히 분석중이에요"
-        description={`광고가 출력될 수 있어요.`}
+        title={`AI가 열심히 ${actionLabel}중이에요`}
+        description={`광고가 출력될 수 있어요`}
       />
     </View>
   );

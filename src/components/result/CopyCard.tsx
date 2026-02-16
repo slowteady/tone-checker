@@ -44,9 +44,11 @@ export const CopyCard = ({ label, description, example }: CopyCardProps) => {
           {label}
         </Txt>
       </View>
-      <Txt typography="st11" fontWeight="semibold" color={colors.grey600} style={{ marginBottom: 16 }}>
-        {description}
-      </Txt>
+      {description && (
+        <Txt typography="st11" fontWeight="semibold" color={colors.grey600} style={{ marginBottom: 16 }}>
+          {description}
+        </Txt>
+      )}
       <View style={[styles.card, { marginBottom: 20 }]}>
         <Txt typography="t6" fontWeight="medium" color={colors.grey900}>
           {example}

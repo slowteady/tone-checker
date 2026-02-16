@@ -488,6 +488,7 @@ function Home({ deviceId }: { deviceId: string }) {
       )}
 
       <AnalysisBottomSheet
+        mode={mode}
         open={analysisBottomSheetOpen}
         onClose={() => setAnalysisBottomSheetOpen(false)}
         onAnalyze={executeAnalyze}
