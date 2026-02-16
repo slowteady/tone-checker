@@ -104,7 +104,7 @@ export const analyzeRequestSchema = z.object({
   /**
    * 분석할 텍스트
    */
-  text: z.string().min(20).max(800),
+  text: z.string().min(20).max(500),
   /**
    * 기기 ID
    */
@@ -132,7 +132,7 @@ export const analyzeRequestV2Schema = z.object({
   /**
    * 분석할 텍스트
    */
-  text: z.string().min(10).max(800),
+  text: z.string().min(10).max(500),
   /**
    * 기기 ID
    */

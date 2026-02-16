@@ -262,7 +262,7 @@ function Page() {
       <Result
         figure={<Loader size="large" style={{ marginBottom: 16 }} />}
         title="AI가 열심히 분석중이에요"
-        description="잠시만 기다려주시면 결과를 출력해드릴게요."
+        description={`광고가 출력될 수 있어요.`}
       />
     </View>
   );

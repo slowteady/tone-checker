@@ -7,6 +7,11 @@
 **목표**: AI 기반 커뮤니케이션 도우미 — 메시지 생성 + 말투 교정
 **개발자**: 이용민 (1인 개발)
 
+**타겟 사용자**: 50대, 30대 초반, 60대 (실사용자 데이터 기준)
+- 디지털 커뮤니케이션에 익숙하지 않은 중장년층
+- 세대 간 소통에서 말투 조정이 필요한 사용자
+- 비즈니스/가족 메시지 작성에 어려움을 느끼는 사용자
+
 ## 🏗️ 기술 스택
 
 ### Core Framework
@@ -238,10 +243,70 @@ npm run lint        # ESLint
 npm test            # Jest 테스트
 ```
 
+## 🔧 개발 워크플로우
+
+### 작업 시작 전 필수 체크리스트
+
+**모든 개발 작업을 시작하기 전에 반드시 다음을 확인:**
+
+1. **관련 Skills 확인**
+   - 사용 가능한 Skills 목록을 먼저 검토
+   - 작업 유형에 맞는 Skill이 있는지 확인
+   - **특히 superpowers 스킬들을 우선 검토**
+
+2. **Skill 선택 가이드**
+
+| 작업 유형 | 추천 Skill | 용도 |
+|----------|-----------|------|
+| 새로운 기능 설계 | `superpowers:brainstorming` | 요구사항 정리 및 설계 승인 |
+| 구현 계획 수립 | `superpowers:writing-plans` | 단계별 구현 계획 작성 |
+| 기능 구현 | `superpowers:test-driven-development` | TDD 방식으로 구현 |
+| 버그 수정 | `superpowers:systematic-debugging` | 체계적 디버깅 |
+| 작업 완료 검증 | `superpowers:verification-before-completion` | 완료 전 검증 |
+| 코드 리뷰 요청 | `superpowers:requesting-code-review` | 리뷰 요청 |
+| Git worktree 사용 | `superpowers:using-git-worktrees` | 격리된 작업 환경 |
+
+3. **MCP 활용**
+   - Context7: 라이브러리 문서 참조 (React Query, Zod 등)
+   - Apps-in-toss: TDS 컴포넌트, Granite API 참조
+   - GitHub: PR/Issue 관리
+
+### 작업 플로우 예시
+
+```
+✅ 올바른 플로우:
+1. 작업 요청 받음
+2. Skills 목록 확인
+3. superpowers:brainstorming으로 설계
+4. 설계 승인 받음
+5. superpowers:writing-plans로 구현 계획
+6. superpowers:test-driven-development로 구현
+7. superpowers:verification-before-completion으로 검증
+8. 완료
+
+❌ 잘못된 플로우:
+1. 작업 요청 받음
+2. 바로 코드 작성 시작 (Skills 확인 안 함)
+3. 테스트 없이 완료
+```
+
+### 중요 원칙
+
+- **Skills 우선**: 작업 시작 전 항상 관련 Skill이 있는지 먼저 확인
+- **문서 우선**: `docs/` 폴더의 설계 문서를 먼저 읽고 작업
+- **테스트 우선**: 가능하면 TDD 방식으로 구현
+- **검증 필수**: 완료 전 반드시 검증 단계 거치기
+
 ## 📋 코딩 컨벤션
 
 ### Git 커밋 메시지
 
+**IMPORTANT: 커밋 규칙**
+- **절대 자동으로 커밋하지 마라**
+- 사용자가 명시적으로 "커밋해", "commit" 등을 요청하기 전까지는 git commit을 실행하지 않는다
+- 변경사항은 unstaged 상태로 유지하고, 사용자 요청 시에만 커밋한다
+
+**커밋 메시지 형식:**
 ```
 feat: 새로운 기능 추가
 fix: 버그 수정

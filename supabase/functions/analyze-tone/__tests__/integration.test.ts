@@ -77,8 +77,8 @@ Deno.test('에러 케이스 - 20자 미만 텍스트', async () => {
   assertEquals(data.error.code, 'TEXT_TOO_SHORT');
 });
 
-Deno.test('에러 케이스 - 800자 초과 텍스트', async () => {
-  const longText = 'a'.repeat(801);
+Deno.test('에러 케이스 - 500자 초과 텍스트', async () => {
+  const longText = 'a'.repeat(501);
   const { status, data } = await callAnalyzeAPI({
     text: longText,
     device_id: generateDeviceId(),

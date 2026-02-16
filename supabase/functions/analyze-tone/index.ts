@@ -167,14 +167,14 @@ Deno.serve(async (req) => {
   const trimmed = text.trim();
   const length = trimmed.length;
 
-  // v2 generate 모드: 10~800자
+  // v2 generate 모드: 10~500자
   if (mode === 'generate') {
     if (length < 10) return fail(400, 'TEXT_TOO_SHORT', '상황 설명을 10자 이상 입력해 주세요.');
-    if (length > 800) return fail(400, 'TEXT_TOO_LONG', '상황 설명을 800자 이하로 줄여 주세요.');
+    if (length > 500) return fail(400, 'TEXT_TOO_LONG', '상황 설명을 500자 이하로 줄여 주세요.');
   } else {
-    // v1, v2 correct 모드: 20~800자
+    // v1, v2 correct 모드: 20~500자
     if (length < 20) return fail(400, 'TEXT_TOO_SHORT', '문장을 20자 이상 입력해 주세요.');
-    if (length > 800) return fail(400, 'TEXT_TOO_LONG', '문장을 800자 이하로 줄여 주세요.');
+    if (length > 500) return fail(400, 'TEXT_TOO_LONG', '문장을 500자 이하로 줄여 주세요.');
   }
 
   const accuracy_warning = length <= 50;

@@ -9,7 +9,7 @@ type FormState = {
 
   // v2 필드
   mode: Mode;
-  scenario: Scenario | null;
+  scenario: Scenario;
   tone: Tone;
 
   // v1 setters
@@ -19,7 +19,7 @@ type FormState = {
 
   // v2 setters
   setMode: (mode: Mode) => void;
-  setScenario: (scenario: Scenario | null) => void;
+  setScenario: (scenario: Scenario) => void;
   setTone: (tone: Tone) => void;
 
   reset: () => void;
@@ -33,7 +33,7 @@ const INITIAL_STATE: Pick<FormState, 'relationship' | 'situation' | 'text' | 'mo
 
   // v2
   mode: 'generate',
-  scenario: null,
+  scenario: 'to_child', // 첫 번째 시나리오가 기본값
   tone: 'soft',
 };
 

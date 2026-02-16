@@ -1,4 +1,4 @@
-import { createRoute, Flex, Stack, useNavigation } from '@granite-js/react-native';
+import { createRoute, Flex, useNavigation } from '@granite-js/react-native';
 import {
   Asset,
   FixedBottomCTA,
@@ -9,15 +9,14 @@ import {
   Toast,
   Txt,
 } from '@toss/tds-react-native';
-import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Keyboard, StyleSheet, View } from 'react-native';
 import { colors } from '@toss/tds-colors';
-import { SCENARIO_OPTIONS, TONE_OPTIONS, type Mode } from 'constants/params';
+import { RELATIONSHIP_OPTIONS, SITUATION_OPTIONS, type Relationship, type Situation } from 'constants/params';
 import { getDeviceId, GoogleAdMob, useOverlay } from '@apps-in-toss/framework';
 import { useFormStore } from 'stores/form';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useRemainingUsage } from 'hooks/useRemainingUsage';
-import { useBottomSheet } from 'hooks/useBottomsheet';
 import { UsageLimitNotice } from 'components/home/UsageLimitNotice';
 import { ErrorResult } from 'components/common/ErrorResult';
 import { AnalysisBottomSheet } from 'components/home/AnalysisBottomSheet';
@@ -27,9 +26,6 @@ import { rewardOnce } from 'api/usage';
 import { ENDPOINT } from 'constants/endpoint';
 import { UsageInfoDto } from 'lib/schema';
 import { createAdFlowLogger } from 'lib/adSentry';
-import { SelectorField } from 'components/common/SelectorField';
-import { ExampleBottomSheet } from 'components/common/ExampleBottomSheet';
-import { getExampleMessages } from 'constants/exampleMessages';
 
 export const Route = createRoute('/', {
   component: Page,
@@ -69,15 +65,12 @@ function Home({ deviceId }: { deviceId: string }) {
 
   const setDeviceId = useDeviceIdStore((s) => s.setDeviceId);
 
-  // v2 form store
-  const mode = useFormStore((s) => s.mode);
-  const scenario = useFormStore((s) => s.scenario);
-  const tone = useFormStore((s) => s.tone);
+  const relationship = useFormStore((s) => s.relationship);
+  const situation = useFormStore((s) => s.situation);
   const text = useFormStore((s) => s.text);
 
-  const setMode = useFormStore((s) => s.setMode);
-  const setScenario = useFormStore((s) => s.setScenario);
-  const setTone = useFormStore((s) => s.setTone);
+  const setRelationship = useFormStore((s) => s.setRelationship);
+  const setSituation = useFormStore((s) => s.setSituation);
   const setText = useFormStore((s) => s.setText);
 
   const qc = useQueryClient();
@@ -91,13 +84,11 @@ function Home({ deviceId }: { deviceId: string }) {
   const rewardChargeRemaining = data.reward_charge_remaining;
   const isChargeable = remainingTotal === 0 && rewardChargeRemaining > 0;
   const isFinished = remainingTotal === 0 && rewardChargeRemaining === 0;
-  const isValid = useMemo(() => {
-    return mode === 'generate' ? text.length >= 10 : text.length >= 20;
-  }, [mode, text]);
 
   const { mutateAsync: chargeReward } = useMutation({
     mutationFn: () => rewardOnce(deviceId),
     onMutate: async () => {
+      // Optimistic update
       const queryKey = [ENDPOINT.RPC_GET_TODAY_STATUS, deviceId];
       await qc.cancelQueries({ queryKey });
       const previous = qc.getQueryData(queryKey);
@@ -176,6 +167,7 @@ function Home({ deviceId }: { deviceId: string }) {
       };
 
       setLoading(true);
+      log.step('start');
 
       if (GoogleAdMob.loadAppsInTossAdMob.isSupported() !== true) {
         setToast({ open: true, message: '이 환경에서는 광고를 지원하지 않아요.' });
@@ -193,6 +185,8 @@ function Home({ deviceId }: { deviceId: string }) {
         finalize({ close: true, reason: 'timeout' });
       }, TIMEOUT_MS);
 
+      log.step('load.request');
+
       const cleanup = GoogleAdMob.loadAppsInTossAdMob({
         options: { adGroupId: rewardAdGroupId },
 
@@ -201,16 +195,21 @@ function Home({ deviceId }: { deviceId: string }) {
 
           switch (event.type) {
             case 'loaded': {
+              log.step('load.loaded');
               cleanup?.();
+
+              log.step('show.request');
 
               GoogleAdMob.showAppsInTossAdMob({
                 options: { adGroupId: rewardAdGroupId },
                 onEvent: async (showEvent) => {
                   if (finished || timedOut) return;
+                  log.step('show.event', { type: showEvent.type });
 
                   switch (showEvent.type) {
                     case 'show':
                       adShown = true;
+                      log.step('show.shown');
                       if (adTimeoutRef.current) {
                         clearTimeout(adTimeoutRef.current);
                         adTimeoutRef.current = null;
@@ -218,13 +217,19 @@ function Home({ deviceId }: { deviceId: string }) {
                       break;
                     case 'userEarnedReward':
                       rewardEarned = true;
+                      log.step('reward.earned');
                       break;
                     case 'dismissed':
+                      log.step('show.dismissed', { rewardEarned });
+
                       if (rewardEarned) {
                         try {
+                          log.step('reward.charge.request');
                           await chargeReward();
+                          log.step('reward.charge.success');
                           finalize({ close: true, reason: 'rewarded_and_charged' });
-                        } catch {
+                        } catch (e) {
+                          log.error(e, 'reward.charge.error');
                           finalize({ close: true, reason: 'charge_failed' });
                         }
                       } else {
@@ -238,9 +243,10 @@ function Home({ deviceId }: { deviceId: string }) {
                       break;
                   }
                 },
-                onError: () => {
+                onError: (error) => {
                   if (finished || timedOut) return;
 
+                  log.error(error, 'show.onError');
                   setToast({ open: true, message: '잠시 후 다시 시도해주세요.' });
                   finalize({ close: true, reason: 'show_error' });
                 },
@@ -253,9 +259,10 @@ function Home({ deviceId }: { deviceId: string }) {
               break;
           }
         },
-        onError: () => {
+        onError: (error) => {
           if (finished) return;
 
+          log.error(error, 'load.onError');
           cleanup?.();
 
           setToast({ open: true, message: '네트워크 연결을 확인해주세요.' });
@@ -297,57 +304,6 @@ function Home({ deviceId }: { deviceId: string }) {
     });
   }, [overlay, rewardChargeRemaining, watchAd]);
 
-  const openScenarioSheet = useBottomSheet('누구에게 보내시나요?', SCENARIO_OPTIONS, scenario, setScenario);
-  const openToneSheet = useBottomSheet('어떤 말투를 원하세요?', TONE_OPTIONS, tone, setTone);
-
-  const openExampleSheet = useCallback(() => {
-    const examples = getExampleMessages(scenario);
-
-    overlay.open(({ isOpen, close, exit }) => (
-      <ExampleBottomSheet
-        open={isOpen}
-        title="예시 문장"
-        examples={examples}
-        onSelect={setText}
-        onClose={close}
-        onExited={exit}
-      />
-    ));
-  }, [overlay, scenario, setText]);
-
-  const selectors = [
-    {
-      key: 'scenario',
-      title: '누구에게 보내시나요?',
-      selectedLabel: SCENARIO_OPTIONS.find((o) => o.value === scenario)?.label,
-      onPress: openScenarioSheet,
-    },
-    {
-      key: 'tone',
-      title: '어떤 말투를 원하세요?',
-      selectedLabel: TONE_OPTIONS.find((o) => o.value === tone)?.label,
-      onPress: openToneSheet,
-    },
-  ] as const;
-
-  const handleAnalyze = useCallback(() => {
-    Keyboard.dismiss();
-
-    if (!isValid) {
-      setToast({
-        open: true,
-        message: mode === 'generate' ? '최소 10자 이상 입력해주세요.' : '최소 20자 이상 입력해주세요.',
-      });
-      return;
-    }
-    setAnalysisBottomSheetOpen(true);
-  }, [isValid, mode, text]);
-
-  const executeAnalyze = useCallback(async () => {
-    setAnalysisBottomSheetOpen(false);
-    navigation.push('/loading');
-  }, [navigation]);
-
   useEffect(() => {
     return () => {
       if (adTimeoutRef.current) {
@@ -357,27 +313,34 @@ function Home({ deviceId }: { deviceId: string }) {
     };
   }, []);
 
+  const executeAnalyze = useCallback(async () => {
+    setAnalysisBottomSheetOpen(false);
+    navigation.push('/loading');
+  }, [deviceId, qc, navigation]);
+
+  const handleAnalyze = useCallback(() => {
+    const isTextTooShort = text.length < 20;
+    Keyboard.dismiss();
+
+    if (isTextTooShort) {
+      setToast({ open: true, message: '최소 20자 이상 입력해주세요.' });
+      return;
+    }
+    setAnalysisBottomSheetOpen(true);
+  }, [text, isChargeable, openAdBottomSheet]);
+
   useEffect(() => {
     setDeviceId(deviceId);
   }, [deviceId, setDeviceId]);
 
-  useEffect(() => {
-    setText('');
-  }, [mode, setText]);
-
   return (
     <>
       <FixedBottomCTAProvider wrapperProps={{ automaticallyAdjustKeyboardInsets: true }}>
-        <View style={[styles.contentContainer, { paddingBottom: 40 }]}>
-          {/* 헤더 */}
-          <Txt typography="t1" fontWeight="bold" style={{ marginBottom: 8 }}>
-            {`내 말투, AI가 도와드려요`}
-          </Txt>
-          <Txt typography="st8" fontWeight="bold" color={colors.grey500} style={{ marginBottom: 16 }}>
-            {`AI로 메시지를 만들고 교정하세요`}
+        <View style={styles.contentContainer}>
+          <Txt typography="t1" fontWeight="bold" style={{ marginBottom: 16 }}>
+            {`AI가 상황에 맞게\n말투를 다듬어드려요`}
           </Txt>
 
-          {/* 남은 횟수 배지 */}
           <Flex direction="row" style={[styles.badge, { marginBottom: 24 }]}>
             <Asset.Icon
               name="icon-lightning-blue"
@@ -393,7 +356,6 @@ function Home({ deviceId }: { deviceId: string }) {
             </Txt>
           </Flex>
 
-          {/* 사용 한도 알림 */}
           {isChargeable && (
             <View style={{ marginBottom: 24 }}>
               <UsageLimitNotice onWatchAd={openAdBottomSheet} />
@@ -408,70 +370,76 @@ function Home({ deviceId }: { deviceId: string }) {
             </View>
           )}
 
-          {/* 모드 선택 */}
-          <Stack.Vertical gutter={8} style={{ marginBottom: 24 }}>
-            <Txt typography="t6" fontWeight="bold" color={colors.grey500}>
-              무엇을 도와드릴까요?
+          <Flex direction="column" style={{ marginBottom: 24 }}>
+            <Txt typography="t6" fontWeight="bold" color={colors.grey500} style={{ marginBottom: 8 }}>
+              누구에게 보내나요?
             </Txt>
-
             <SegmentedControl.Root
-              value={mode}
-              onChange={(value) => setMode(value as Mode)}
-              name="mode"
+              value={relationship}
+              onChange={(value) => setRelationship(value as Relationship)}
+              name="relationship"
               style={{ paddingHorizontal: 0 }}
             >
-              <SegmentedControl.Item value="generate">메시지 생성</SegmentedControl.Item>
-              <SegmentedControl.Item value="correct">말투 교정</SegmentedControl.Item>
+              {RELATIONSHIP_OPTIONS.map((opt) => (
+                <SegmentedControl.Item key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SegmentedControl.Item>
+              ))}
             </SegmentedControl.Root>
-          </Stack.Vertical>
+          </Flex>
 
-          {/* 시나리오/톤 선택 Grid */}
-          <Stack.Horizontal gutter={12} style={{ marginBottom: 24 }}>
-            {selectors.map((selector) => (
-              <SelectorField
-                key={selector.key}
-                title={selector.title}
-                selectedLabel={selector.selectedLabel}
-                onPress={selector.onPress}
-              />
-            ))}
-          </Stack.Horizontal>
+          <Flex direction="column" style={{ marginBottom: 24 }}>
+            <Txt typography="t6" fontWeight="bold" color={colors.grey500} style={{ marginBottom: 8 }}>
+              어떤 분위기인가요?
+            </Txt>
+            <SegmentedControl.Root
+              value={situation}
+              onChange={(value) => setSituation(value as Situation)}
+              name="situation"
+              style={{ paddingHorizontal: 0 }}
+            >
+              {SITUATION_OPTIONS.map((opt) => (
+                <SegmentedControl.Item key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SegmentedControl.Item>
+              ))}
+            </SegmentedControl.Root>
+          </Flex>
 
-          {/* 텍스트 입력 */}
-          <Stack.Vertical gutter={8} style={{ marginBottom: 24 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Txt typography="t6" fontWeight="bold" color={colors.grey500}>
-                {mode === 'generate' ? '상황을 자유롭게 설명해 주세요' : '교정할 문장을 입력해 주세요'}
-              </Txt>
-              {mode === 'generate' && (
-                <Pressable onPress={openExampleSheet}>
-                  <Txt typography="t7" fontWeight="bold" color={colors.blue600}>
-                    예시 보기
+          <View style={{ position: 'relative' }}>
+            <TextArea
+              placeholder={`상대에게 보내고 싶은 문장을 입력해 주세요.`}
+              value={text}
+              onChangeText={setText}
+              maxLength={800}
+              textAreaStyle={{ height: 180, marginBottom: 20 }}
+              containerStyle={{ paddingVertical: 0, paddingHorizontal: 0, marginBottom: 24 }}
+              help={
+                <Flex direction="row" align="center" style={{ paddingVertical: 8, width: '100%' }}>
+                  <Asset.Icon
+                    name="icon-info-circle-blue"
+                    frameShape={{ width: 16, height: 16 }}
+                    style={{ marginRight: 4 }}
+                    color={colors.red500}
+                    accessibilityLabel={'안내 아이콘'}
+                  />
+                  <Txt typography="st12" fontWeight="semiBold" color={colors.grey500}>
+                    {`최소 20자 이상 입력해주세요.`}
                   </Txt>
-                </Pressable>
-              )}
+                </Flex>
+              }
+            />
+
+            <View style={styles.indicator}>
+              <Txt typography="st12" fontWeight="bold" color={colors.grey500}>
+                {text.length} / 800
+              </Txt>
             </View>
-
-            <Stack.Vertical>
-              <TextArea
-                value={text}
-                onChangeText={setText}
-                maxLength={500}
-                textAreaStyle={{ height: 200, marginBottom: 40 }}
-                containerStyle={{ paddingVertical: 0, paddingHorizontal: 0, marginBottom: 24 }}
-              />
-
-              <View style={styles.indicator}>
-                <Txt typography="st12" fontWeight="bold" color={colors.grey500}>
-                  {text.length} / 500
-                </Txt>
-              </View>
-            </Stack.Vertical>
-          </Stack.Vertical>
+          </View>
 
           <FixedBottomCTA onPress={handleAnalyze} disabled={hasLimit}>
             <Txt typography="t6" fontWeight="bold" color={colors.white}>
-              {mode === 'generate' ? '생성하기' : '교정하기'}
+              분석하기
             </Txt>
           </FixedBottomCTA>
         </View>
@@ -512,7 +480,7 @@ const styles = StyleSheet.create({
   },
   indicator: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 80,
     right: 20,
     backgroundColor: colors.background,
     paddingHorizontal: 8,
