@@ -16,3 +16,7 @@ yarn-error.log
 .swc
 .DS_Store
 *.ait
+
+# Taskmaster
+.taskmaster/reports/
+.taskmaster/templates/

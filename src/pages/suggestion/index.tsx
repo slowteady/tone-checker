@@ -42,30 +42,6 @@ function Page() {
   return (
     <FixedBottomCTAProvider>
       <View style={styles.container}>
-        {/* correct 모드: 종합 점수 표시 */}
-        {isCorrect && (
-          <View
-            style={{
-              marginBottom: 16,
-              padding: 16,
-              backgroundColor: colors.grey50,
-              borderRadius: 12,
-            }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Txt typography="st6" fontWeight="semiBold" color={colors.grey700}>
-                종합 점수
-              </Txt>
-              <Txt typography="t4" fontWeight="bold" color={colors.grey900}>
-                {analysisResult.data.overall_score}점
-              </Txt>
-            </View>
-            <Txt typography="st11" color={colors.grey600} style={{ marginTop: 8 }}>
-              {analysisResult.data.diagnosis}
-            </Txt>
-          </View>
-        )}
-
         <Txt typography="t3" fontWeight="bold" color={colors.grey900} style={{ marginBottom: 16 }}>
           이런 표현은 어떠세요?
         </Txt>

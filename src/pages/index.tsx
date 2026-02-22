@@ -339,6 +339,12 @@ function Home({ deviceId }: { deviceId: string }) {
       });
       return;
     }
+
+    if (text.length > 500) {
+      setToast({ open: true, message: '500자 이하로 입력해주세요.' });
+      return;
+    }
+
     setAnalysisBottomSheetOpen(true);
   }, [isValid, mode, text]);
 
