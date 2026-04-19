@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/leeyongmin/.claude/**)",
+      "Bash(claude mcp:*)",
+      "mcp__tavily-search__tavily_crawl",
+      "Bash(npm view:*)",
+      "mcp__tavily-search__tavily_search",
+      "mcp__tavily-search__tavily_extract",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm install:*)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_click",
+      "Bash(node:*)",
+      "Bash(npx ait:*)",
+      "Bash(npx granite:*)",
+      "Bash(ls *.ait)",
+      "Bash(./node_modules/.bin/tsc --noEmit 2>&1)",
+      "Bash(./node_modules/.bin/eslint .)",
+      "Bash(./node_modules/.bin/eslint src/ pages/ 2>&1)",
+      "Bash(nvm install:*)",
+      "Bash(nvm use:*)",
+      "Bash(npm -v)",
+      "Bash(source ~/.nvm/nvm.sh)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true
+}

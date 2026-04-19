@@ -16,9 +16,11 @@
 
 ### Core Framework
 
-- **Granite**: 토스 미니앱 프레임워크 (@granite-js/*)
-- **React Native**: 0.72.6
-- **React**: 18.2.0
+- **Granite**: 토스 미니앱 프레임워크 (@granite-js/* 1.0.18)
+- **@apps-in-toss/framework**: 2.4.7
+- **brick-module**: 0.5.0
+- **React Native**: 0.84.0
+- **React**: 19.2.3
 - **TypeScript**: 5.8.3
 
 ### State Management
@@ -28,7 +30,7 @@
 
 ### UI & Styling
 
-- **TDS (Toss Design System)**: @toss/tds-react-native 1.3.8
+- **TDS (Toss Design System)**: @toss/tds-react-native 2.0.3
 - **TDS Colors**: @toss/tds-colors 0.1.0
 
 ### Backend & Database
@@ -419,7 +421,7 @@ docs/
 
 ### 앱인토스 배포
 
-Granite CLI를 통해 배포:
+AIT CLI를 통해 배포 (`ait build`):
 
 ```bash
 npm run build

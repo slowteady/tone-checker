@@ -23,7 +23,7 @@ const AD_SHOW_TIMEOUT_MS = 3_000;
 function Page() {
   const [analysisDone, setAnalysisDone] = useState(false);
   const [adDismissed, setAdDismissed] = useState(false);
-  const adTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const adTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const deviceId = useDeviceIdStore((s) => s.deviceId);
 

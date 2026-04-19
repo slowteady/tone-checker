@@ -64,7 +64,7 @@ function Home({ deviceId }: { deviceId: string }) {
   const [toast, setToast] = useState({ open: false, message: '' });
   const [analysisBottomSheetOpen, setAnalysisBottomSheetOpen] = useState(false);
 
-  const adTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const adTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rewardAdGroupId = __DEV__ ? import.meta.env.REWARD_AD_DEV_ID : import.meta.env.REWARD_AD_ID;
 
   const setDeviceId = useDeviceIdStore((s) => s.setDeviceId);
